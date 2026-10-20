@@ -1,0 +1,3 @@
+// Types, Zod schemas, and money and date helpers used by both the web app and
+// the API. Nothing here may depend on server-only code: the browser loads it.
+export {}

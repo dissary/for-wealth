@@ -1,3 +1,21 @@
 packages:
   - apps/*
   - packages/*
+
+# Versions shared between packages. Hono must match on both sides of the RPC
+# client, or its types break ("Type instantiation is excessively deep").
+catalog:
+  better-auth: ^1.7.10
+  hono: ^4.13.13
+  zod: ^4.6.7
+
+# Supply chain: don't install versions published less than 3 days ago
+# (in minutes).
+minimumReleaseAge: 4320
+
+# Supply chain: install scripts run only for packages set to true here. pnpm
+# fails the install when an unlisted package wants to run one.
+allowBuilds:
+  # Its script only checks the binary, which it also gets from its
+  # platform-specific package.
+  esbuild: false

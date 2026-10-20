@@ -1,0 +1,24 @@
+{
+  "name": "@for-wealth/shared",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.10.0",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.69.0",
+    "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  }
+}
