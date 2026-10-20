@@ -10,7 +10,7 @@ Personal app for tracking and planning income and spending. pnpm monorepo: `apps
 
 ## Invariants
 
-- Money is an integer in minor units (sen) end to end; convert only for display.
+- Money is an integer in the currency's minor units (sen for MYR) end to end; convert only for display, using the currency's own number of decimal places, never a hard-coded 100.
 - A Transaction's date is a calendar date in the user's time zone; compute today, this week and this month in that zone.
 - Every query on user data takes the user ID as a required argument.
 

@@ -1,5 +1,7 @@
 # Better Auth + Hono + Drizzle + PostgreSQL: setup for slice 1
 
+> This is a dated snapshot and is not kept up to date. The decisions taken from it are recorded in [v1-spec.md → Setup decisions](../v1-spec.md#setup-decisions) and [Data and security](../v1-spec.md#data-and-security). Where this doc and the spec disagree (table names, password rules, Google in slice 1), follow the spec.
+
 Researched on 2026-10-18. Covers only what slice 1 of [v1-spec.md](../v1-spec.md) needs. Every claim links to the official docs, source code, release notes or npm entry it comes from (see [Sources](#sources)). Anything not confirmed in a primary source is marked **(unverified)**.
 
 ## What slice 1 needs
