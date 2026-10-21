@@ -1,12 +1,10 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import app from '../src/app.js'
 import { pool } from '../src/db/client.js'
-import { APP_ORIGIN, type MailerSpy, signUpAndVerify, startFresh } from './helpers.js'
-
-let send: MailerSpy
+import { APP_ORIGIN, signInNewUser, startFresh } from './helpers.js'
 
 beforeEach(async () => {
-  send = await startFresh()
+  await startFresh()
 })
 afterAll(() => pool.end())
 
@@ -25,7 +23,7 @@ async function signedInUser(cookie: string) {
 
 describe('changing your details after signup', () => {
   it('refuses a new currency and keeps the old one', async () => {
-    const cookie = await signUpAndVerify(send)
+    const cookie = await signInNewUser()
 
     const res = await updateUser(cookie, { currency: 'USD' })
 
@@ -35,7 +33,7 @@ describe('changing your details after signup', () => {
   })
 
   it('refuses a currency sent alongside other changes, changing nothing', async () => {
-    const cookie = await signUpAndVerify(send)
+    const cookie = await signInNewUser()
 
     const res = await updateUser(cookie, { name: 'Aisyah R', currency: 'SGD' })
 
@@ -44,7 +42,7 @@ describe('changing your details after signup', () => {
   })
 
   it('refuses a blank name and keeps the old one', async () => {
-    const cookie = await signUpAndVerify(send)
+    const cookie = await signInNewUser()
 
     const res = await updateUser(cookie, { name: '  ' })
 
@@ -55,7 +53,7 @@ describe('changing your details after signup', () => {
 
   // Settings (slice 6) lets people change it.
   it('accepts a new time zone, in its canonical spelling', async () => {
-    const cookie = await signUpAndVerify(send)
+    const cookie = await signInNewUser()
 
     const res = await updateUser(cookie, { timeZone: 'europe/london' })
 
@@ -64,7 +62,7 @@ describe('changing your details after signup', () => {
   })
 
   it('refuses an unknown time zone', async () => {
-    const cookie = await signUpAndVerify(send)
+    const cookie = await signInNewUser()
 
     const res = await updateUser(cookie, { timeZone: 'Mars/Olympus_Mons' })
 

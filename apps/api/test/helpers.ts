@@ -1,7 +1,8 @@
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { type MockInstance, vi } from 'vitest'
 import app from '../src/app.js'
 import { db } from '../src/db/client.js'
+import { users } from '../src/db/schema/index.js'
 import { mailer } from '../src/email.js'
 import { env } from '../src/env.js'
 import { signUpTiming } from '../src/sign-up-timing.js'
@@ -54,10 +55,47 @@ export function cookiesFrom(res: Response) {
     .join('; ')
 }
 
-// Signs NEW_USER up and opens their verification link, which signs them in.
-// Returns the session cookie.
-export async function signUpAndVerify(send: MailerSpy) {
-  await signUp(NEW_USER)
-  const link = lastLink(send)
-  return cookiesFrom(await app.request(link.pathname + link.search))
+// A second person, for checking that each user sees only their own data.
+export const OTHER_USER = {
+  name: 'Wei Ming',
+  email: 'weiming@example.com',
+  password: 'staple orbit lantern',
+  currency: 'JPY',
+  timeZone: 'Asia/Tokyo',
+}
+
+export function signIn(credentials: { email: string; password: string }) {
+  return app.request('/api/auth/sign-in/email', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: APP_ORIGIN },
+    body: JSON.stringify(credentials),
+  })
+}
+
+export function signOut(cookie: string) {
+  return app.request('/api/auth/sign-out', {
+    method: 'POST',
+    headers: { origin: APP_ORIGIN, cookie },
+  })
+}
+
+export async function getMe(cookie?: string) {
+  return app.request('/api/me', { headers: cookie ? { cookie } : {} })
+}
+
+// The session cookie a response sets, with its attributes (Max-Age and so on).
+export function sessionCookieFrom(res: Response) {
+  return res.headers.getSetCookie().find((cookie) => cookie.includes('session_token='))
+}
+
+// Signs a new user up, marks their email verified straight in the database
+// (skipping the inbox), then signs them in. Returns the session cookie.
+export async function signInNewUser(user: typeof NEW_USER = NEW_USER) {
+  const signedUp = await signUp(user)
+  if (!signedUp.ok) throw new Error(`Sign-up failed: ${signedUp.status}`)
+  await db.update(users).set({ emailVerified: true }).where(eq(users.email, user.email))
+
+  const signedIn = await signIn(user)
+  if (!signedIn.ok) throw new Error(`Sign-in failed: ${signedIn.status}`)
+  return cookiesFrom(signedIn)
 }

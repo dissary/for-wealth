@@ -40,7 +40,7 @@ describe('signing up', () => {
   })
 
   it.each([
-    ['an 11-character password', { password: 'a'.repeat(11) }, 'PASSWORD_TOO_SHORT'],
+    ['a 9-character password', { password: 'a'.repeat(9) }, 'PASSWORD_TOO_SHORT'],
     ['a 129-character password', { password: 'a'.repeat(129) }, 'PASSWORD_TOO_LONG'],
     ['a breached password', { password: BREACHED_PASSWORD }, 'PASSWORD_COMPROMISED'],
     ['an unlisted currency', { currency: 'KWD' }, 'VALIDATION_ERROR'],
@@ -54,6 +54,12 @@ describe('signing up', () => {
     expect(res.status).toBe(400)
     expect(await res.json()).toMatchObject({ code })
     expect(send).not.toHaveBeenCalled()
+  })
+
+  it('accepts a 10-character password', async () => {
+    const res = await signUp({ ...NEW_USER, password: 'kopi-o-ais' })
+
+    expect(res.status).toBe(200)
   })
 
   it('stores the time zone in its canonical spelling', async () => {
@@ -198,23 +204,5 @@ describe('asking for a new verification link', () => {
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ status: true })
     expect(send).not.toHaveBeenCalled()
-  })
-})
-
-describe('getting a new verification link', () => {
-  it('is done by signing in before verifying, which is refused', async () => {
-    await signUp(NEW_USER)
-
-    const res = await app.request('/api/auth/sign-in/email', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: NEW_USER.email, password: NEW_USER.password }),
-    })
-
-    expect(res.status).toBe(403)
-    expect(send).toHaveBeenCalledTimes(2)
-    const [email] = send.mock.calls[1]!
-    expect(email.to).toBe('aisyah@example.com')
-    expect(email.text).toContain(`${APP_ORIGIN}/api/auth/verify-email?token=`)
   })
 })

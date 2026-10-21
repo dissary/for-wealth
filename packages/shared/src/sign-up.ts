@@ -4,7 +4,7 @@ import { timeZoneSchema } from './time-zone.js'
 
 // Length is the only password rule (v1-spec "Data and security"). The API
 // gives Better Auth the same limits.
-export const PASSWORD_MIN_LENGTH = 12
+export const PASSWORD_MIN_LENGTH = 10
 export const PASSWORD_MAX_LENGTH = 128
 export const NAME_MAX_LENGTH = 100
 

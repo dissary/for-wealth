@@ -31,6 +31,15 @@ export const auth = betterAuth({
     transaction: true,
   }),
 
+  // Better Auth's defaults: a session lasts 7 days and is extended once it's
+  // a day old and still in use. The cookie cache would save a database lookup
+  // per request, but a signed-out or revoked session would keep working until
+  // the cache expired, so it stays off (as it is by default) and every request
+  // checks the database.
+  session: {
+    cookieCache: { enabled: false },
+  },
+
   emailAndPassword: {
     enabled: true,
     minPasswordLength: PASSWORD_MIN_LENGTH,

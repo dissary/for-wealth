@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { authClient } from '@/lib/auth-client'
+import { signInURL } from '@/lib/redirect'
 
 const formSchema = z.object({ email: emailSchema })
 type FormValues = z.infer<typeof formSchema>
@@ -23,7 +24,10 @@ function LinkRequested({ email }: { email: string }) {
 }
 
 async function requestLink(email: string) {
-  return authClient.sendVerificationEmail({ email, callbackURL: '/' })
+  return authClient.sendVerificationEmail({
+    email,
+    callbackURL: signInURL('/', window.location.origin),
+  })
 }
 
 // For someone whose link expired or broke: asks for the email, then sends a
