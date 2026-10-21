@@ -4,7 +4,9 @@ packages:
 
 # Versions shared between packages. Hono must match on both sides of the RPC
 # client, or its types break ("Type instantiation is excessively deep").
+# Better Auth's CLI (`auth`) must be the same version as Better Auth.
 catalog:
+  auth: ^1.7.10
   better-auth: ^1.7.10
   hono: ^4.13.13
   zod: ^4.6.7

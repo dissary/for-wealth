@@ -4,6 +4,7 @@ import { parseEnv } from '../src/env.js'
 const valid = {
   DATABASE_URL: 'postgres://for_wealth:for_wealth@localhost:5432/for_wealth',
   BETTER_AUTH_SECRET: 'a'.repeat(32),
+  BETTER_AUTH_URL: 'http://localhost:5173',
 }
 
 describe('parseEnv', () => {
@@ -16,9 +17,8 @@ describe('parseEnv', () => {
   })
 
   it('refuses to start without an auth secret', () => {
-    expect(() => parseEnv({ DATABASE_URL: valid.DATABASE_URL })).toThrow(
-      /BETTER_AUTH_SECRET/,
-    )
+    const { BETTER_AUTH_SECRET: _, ...rest } = valid
+    expect(() => parseEnv(rest)).toThrow(/BETTER_AUTH_SECRET/)
   })
 
   it('refuses an auth secret shorter than 32 characters', () => {
@@ -34,9 +34,8 @@ describe('parseEnv', () => {
   })
 
   it('refuses to start without a database URL', () => {
-    expect(() =>
-      parseEnv({ BETTER_AUTH_SECRET: valid.BETTER_AUTH_SECRET }),
-    ).toThrow(/DATABASE_URL/)
+    const { DATABASE_URL: _, ...rest } = valid
+    expect(() => parseEnv(rest)).toThrow(/DATABASE_URL/)
   })
 
   it('refuses a database URL that is not Postgres', () => {
@@ -44,4 +43,18 @@ describe('parseEnv', () => {
       parseEnv({ ...valid, DATABASE_URL: 'mysql://localhost:3306/for_wealth' }),
     ).toThrow(/DATABASE_URL/)
   })
+
+  it('refuses to start without the address the browser uses', () => {
+    const { BETTER_AUTH_URL: _, ...rest } = valid
+    expect(() => parseEnv(rest)).toThrow(/BETTER_AUTH_URL/)
+  })
+
+  it.each(['localhost:5173', 'ftp://localhost:5173'])(
+    'refuses the auth URL %s',
+    (url) => {
+      expect(() => parseEnv({ ...valid, BETTER_AUTH_URL: url })).toThrow(
+        /BETTER_AUTH_URL/,
+      )
+    },
+  )
 })

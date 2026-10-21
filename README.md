@@ -2,7 +2,7 @@
 
 Track, plan and understand your spending, day by day, week by week, month by month.
 
-**Status:** early. Only the walking skeleton exists so far: the home page shows whether the browser can reach the API and the API can reach Postgres. Features arrive slice by slice, in the build order in [docs/v1-spec.md](docs/v1-spec.md).
+**Status:** early. You can create an account and verify your email; signing in comes next. Features arrive slice by slice, in the build order in [docs/v1-spec.md](docs/v1-spec.md).
 
 ## Layout
 
@@ -51,7 +51,9 @@ Needs Node 22.12 or later, pnpm (the version in `package.json` → `packageManag
    pnpm dev
    ```
 
-   Open <http://localhost:5173>. The home page says "API connected" when the API can reach Postgres. Vite forwards `/api/*` to the API on port 3000, so the browser only ever talks to one address.
+   Open <http://localhost:5173> and choose **Create an account**. No real email is sent in development: the verification link is printed in this terminal. Open it in the same browser to verify the email and sign in. Vite forwards `/api/*` to the API on port 3000, so the browser only ever talks to one address, and the link and the session cookie use that address too.
+
+   Signing up checks the password against [Have I Been Pwned](https://haveibeenpwned.com/Passwords), so it needs an internet connection. Only the first five characters of the password's SHA-1 hash leave the machine.
 
 ## Everyday use
 
@@ -62,9 +64,9 @@ Setup is a one-off. After that:
 | Start working | `podman compose up -d`, then `pnpm dev` |
 | Stop the app | `Ctrl+C` in the terminal running `pnpm dev` |
 | Stop Postgres | `podman compose stop` (your data is kept) |
-| Catch up after pulling new changes | `pnpm install`, then `pnpm db:migrate` |
+| Catch up after pulling new changes | `pnpm install`, then `pnpm db:migrate`. If the API then stops with `Invalid environment`, compare `apps/api/.env` with `apps/api/.env.example` and add the new variable. |
 
-The API's log, including any errors, appears in the terminal running `pnpm dev`. Once sign-up exists, emails such as verification links print there too, because the app sends no real email until slice 7 of the spec.
+The API's log, including any errors, appears in the terminal running `pnpm dev`. Emails such as verification links print there too, because the app sends no real email until slice 7 of the spec.
 
 ## Database changes
 
@@ -76,6 +78,12 @@ pnpm db:migrate    # applies it to the dev database
 ```
 
 Never use `drizzle-kit push`.
+
+Better Auth's tables (`users`, `sessions`, `accounts`, `verifications`) are generated from its config in `apps/api/src/auth.ts` into `apps/api/src/db/schema/auth.ts`. Don't edit that file by hand. After changing anything in the config that affects the tables, such as a user field or a plugin, regenerate it first, then make the migration as above:
+
+```sh
+pnpm auth:generate
+```
 
 ## Checks
 
@@ -103,7 +111,9 @@ The workflow's actions are pinned to a full commit SHA. To update one, use the S
 
 ## Troubleshooting
 
-- **The home page says "API not connected".** The API isn't running or has crashed. Check the terminal running `pnpm dev` for its error, and check Postgres is up with `podman compose ps`.
+- **Creating an account fails straight away, or the home page never shows you as signed in.** The API isn't running or has crashed. Check the terminal running `pnpm dev` for its error, and check Postgres is up with `podman compose ps`. `curl localhost:5173/api/health` says `ok` when the API can reach Postgres.
+- **Creating an account says "Failed to check password".** The breach check couldn't reach Have I Been Pwned. Check the internet connection and try again.
+- **The API stops with `Invalid environment` naming `BETTER_AUTH_URL`.** Your `apps/api/.env` predates it. Add `BETTER_AUTH_URL=http://localhost:5173`.
 - **The API stops with `Invalid environment`.** A value in `apps/api/.env` is missing or wrong; the message names it. A blank `BETTER_AUTH_SECRET` means the file was copied from the example but never given a secret: run the `sed` line from step 3.
 - **The API stops saying `.env` was not found.** Step 3 was skipped.
 - **Postgres won't start because port 5432 is in use.** Another Postgres is already running on this machine. Stop it, then run `podman compose up -d` again.
@@ -113,7 +123,7 @@ The workflow's actions are pinned to a full commit SHA. To update one, use the S
 
 Set in `pnpm-workspace.yaml`:
 
-- Hono, Better Auth and Zod versions come from the pnpm `catalog`, so every package uses the same version. Reference them as `"catalog:"`.
+- Hono, Better Auth (and its `auth` CLI) and Zod versions come from the pnpm `catalog`, so every package uses the same version. Reference them as `"catalog:"`.
 - `minimumReleaseAge` stops pnpm installing versions published less than 3 days ago.
 - Install scripts run only for packages set to `true` under `allowBuilds`. If an install fails with `ERR_PNPM_IGNORED_BUILDS`, decide whether that package really needs its script before allowing it.
 

@@ -18,8 +18,10 @@ export default defineConfig({
     env: {
       DATABASE_URL: databaseUrl,
       BETTER_AUTH_SECRET: 'test-only-secret-not-used-anywhere-else',
+      BETTER_AUTH_URL: 'http://localhost:5173',
     },
     globalSetup: ['./test/global-setup.ts'],
+    setupFiles: ['./test/no-network.ts'],
     // The tests share one database, so test files run one at a time.
     fileParallelism: false,
   },

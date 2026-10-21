@@ -10,5 +10,9 @@ export default defineConfig([
     languageOptions: {
       globals: globals.node,
     },
+    rules: {
+      // `const { secret: _, ...rest } = obj` is how a key is left out.
+      '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }],
+    },
   },
 ])
