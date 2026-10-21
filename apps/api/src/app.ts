@@ -4,6 +4,7 @@ import { secureHeaders } from 'hono/secure-headers'
 import { auth } from './auth.js'
 import { env } from './env.js'
 import { health } from './routes/health.js'
+import { me } from './routes/me.js'
 import { signUpResponseFloor } from './sign-up-timing.js'
 
 // Built apart from the server in index.ts, so tests can call app.request()
@@ -20,6 +21,7 @@ const app = new Hono()
   // Better Auth's routes live under /api/auth (its default basePath).
   .on(['GET', 'POST'], '/auth/*', (c) => auth.handler(c.req.raw))
   .route('/health', health)
+  .route('/me', me)
 
 export type AppType = typeof app
 export default app

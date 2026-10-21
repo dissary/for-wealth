@@ -37,12 +37,12 @@ describe('signUpSchema', () => {
   })
 
   describe('password', () => {
-    it('rejects 11 characters', () => {
-      expect(issuesFor({ ...valid, password: 'a'.repeat(11) })).toEqual(['password'])
+    it('rejects 9 characters', () => {
+      expect(issuesFor({ ...valid, password: 'a'.repeat(9) })).toEqual(['password'])
     })
 
-    it('accepts 12 and 128 characters', () => {
-      expect(issuesFor({ ...valid, password: 'a'.repeat(12) })).toEqual([])
+    it('accepts 10 and 128 characters', () => {
+      expect(issuesFor({ ...valid, password: 'a'.repeat(10) })).toEqual([])
       expect(issuesFor({ ...valid, password: 'a'.repeat(128) })).toEqual([])
     })
 

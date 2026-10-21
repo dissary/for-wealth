@@ -7,10 +7,11 @@ import {
   type SignUpOutput,
 } from '@for-wealth/shared'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Tagline, Wordmark } from '@/components/brand'
+import { DevEmailNote } from '@/components/dev-email-note'
 import { SendLinkAgainButton } from '@/components/new-verification-link'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,6 +25,7 @@ import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { type AuthErrorCode, authClient } from '@/lib/auth-client'
 import { currencyLabel } from '@/lib/currency'
+import { signInURL } from '@/lib/redirect'
 
 export const Route = createFileRoute('/sign-up')({
   component: SignUp,
@@ -67,7 +69,10 @@ function SignUpForm({ onSent }: { onSent: (email: string) => void }) {
   const { errors, isSubmitting } = form.formState
 
   async function onSubmit(values: SignUpOutput) {
-    const { error } = await authClient.signUp.email({ ...values, callbackURL: '/' })
+    const { error } = await authClient.signUp.email({
+      ...values,
+      callbackURL: signInURL('/', window.location.origin),
+    })
     if (!error) return onSent(values.email)
 
     const message = error.message ?? 'Your account could not be created. Try again.'
@@ -159,6 +164,12 @@ function SignUpForm({ onSent }: { onSent: (email: string) => void }) {
           <Button type="submit" size="lg" disabled={isSubmitting}>
             {isSubmitting ? 'Creating account…' : 'Create account'}
           </Button>
+          <p className="text-sm">
+            Already have an account?{' '}
+            <Link to="/sign-in" className="font-medium text-primary underline-offset-4 hover:underline">
+              Sign in
+            </Link>
+          </p>
         </FieldGroup>
       </form>
     </section>
@@ -179,12 +190,7 @@ function CheckYourEmail({ email }: { email: string }) {
         account, no new account is made and no link is sent.
       </p>
       <SendLinkAgainButton email={email} />
-      {import.meta.env.DEV && (
-        <p className="text-sm text-muted-foreground">
-          In development no email is sent. The link is printed in the terminal
-          running the API.
-        </p>
-      )}
+      <DevEmailNote />
     </section>
   )
 }

@@ -136,6 +136,9 @@ Settled on 2026-10-20 from [the slice 1 research](research/better-auth-hono-driz
 | Getting a new verification link | Signing up again sends nothing for an email that already has an account. A new link comes from the "Send a new link" form shown with an expired or broken link (Better Auth's `/send-verification-email`, which answers the same for any email) or from signing in before verifying (`sendOnSignIn`). |
 | Origin checks in tests | Better Auth turns its own origin check off when `NODE_ENV` is `test`. It is set back on (`advanced.disableOriginCheck: false`), so the tests exercise what production runs. |
 | Sessions | Database sessions with Better Auth's defaults (7 days, extended after 1 day of use). Cookie cache off, so a revoked session stops working immediately. Auto sign-in after verifying email. |
+| Routes that need a session | API routes sit behind `requireSession` (`apps/api/src/require-session.ts`). It answers 401 without a valid session, gives handlers a non-null `user` (whose `id` every query on user data takes), marks the answer `Cache-Control: no-store`, and passes on the cookie Better Auth sets when it extends the session, so any API call keeps it alive. `GET /api/me` returns the user's own ID, name, email, currency and time zone. In the web app, pages that need a session live under the `_signed-in` layout route, whose `beforeLoad` reads `/api/me` and sends anyone else to `/sign-in?redirect=<path>`. |
+| Where links land | Every Better Auth link (verification emails, the sign-in `callbackURL`) comes back to `/sign-in`, carrying `?redirect=` when the user was going somewhere. A signed-in user there is sent on to that path; a broken link arrives with `?error=` and the page offers a new one. `redirect` is followed only if it parses to a path on the app's own origin (`apps/web/src/lib/redirect.ts`), otherwise it goes to `/`. |
+| Wrong sign-in details | One message for a wrong password and an unknown email. Better Auth hashes a dummy password for an unknown email, so the timing matches too, and it checks the password before the verification state, so only someone with the right password learns an email is waiting to be verified (403, and a fresh link is sent). |
 | Dev URLs | `BETTER_AUTH_URL` is the Vite address (`http://localhost:5173`), so cookies and email links go through the proxy. Slice 1 isn't done until clicking a verification link from the console signs the user in. |
 | Web ↔ API types | `apps/web` imports types only from `@for-wealth/api`. Switch to compiled `.d.ts` files if the editor slows down. Hono, Better Auth and Zod versions are shared through a pnpm catalog. |
 | Node | `engines` is `>=22.12`. |
@@ -168,7 +171,7 @@ Before inviting friends (slice 7):
 - Every app table's `user_id` references `users` with `ON DELETE CASCADE`. "Delete my account" removes the user and all their data in one delete.
 - HTTPS only. Secrets go in environment variables and are never committed.
 - Environment variables are checked with Zod at startup. The API refuses to start if `BETTER_AUTH_SECRET` is missing or shorter than 32 characters, and never falls back to Better Auth's default secret.
-- Passwords: at least 12 characters, at most 128, and no rules about character types. Passwords found in known data breaches are rejected (Better Auth's `haveIBeenPwned` plugin). Resetting the password signs the user out everywhere.
+- Passwords: at least 10 characters, at most 128, and no rules about character types. (Lowered from 12 on 2026-10-21, by the author's choice. That is still above OWASP's minimum of 8, and the breach check below catches common short passwords.) Passwords found in known data breaches are rejected (Better Auth's `haveIBeenPwned` plugin). Resetting the password signs the user out everywhere.
 - Signup and password reset never reveal whether an email has an account.
 - All `/api/*` routes, not just Better Auth's, reject state-changing requests from other sites (Hono's `csrf()` middleware), as a second layer on top of `SameSite=Lax` cookies.
 - Security headers on every response (Hono's `secureHeaders()`).
@@ -181,7 +184,7 @@ Before inviting friends (slice 7):
 - Vitest tests in `packages/shared` for the money and date logic: Period boundaries, time zones, Free to Spend, Remaining, Budget usage, Recurring due dates (including day 31).
 - API integration tests against a real Postgres, including **"user A cannot read or change user B's data"** for every endpoint that touches user data.
 - API tests use a separate `for_wealth_test` database, run one file at a time (`fileParallelism: false`) and empty the tables between tests. A test signs in by signing up, marking the email verified in the database, then signing in.
-- Slice 1 auth tests: no session gives 401, sign-in before verifying gives 403, a verified sign-in works, currency can't be changed, a breached or short password is rejected, a cross-site POST is rejected, and the verification email is sent.
+- Slice 1 auth tests: no session gives 401, sign-in before verifying gives 403, a verified sign-in works, currency can't be changed, a breached or short password is rejected, a cross-site POST is rejected, the verification email is sent, a signed-out session's cookie gives 401, a session in use is extended, and two users each see only their own details.
 
 ## Build order
 

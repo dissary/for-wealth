@@ -1,7 +1,14 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import app from '../src/app.js'
 import { pool } from '../src/db/client.js'
-import { APP_ORIGIN, type MailerSpy, NEW_USER, startFresh } from './helpers.js'
+import {
+  APP_ORIGIN,
+  getMe,
+  type MailerSpy,
+  NEW_USER,
+  signInNewUser,
+  startFresh,
+} from './helpers.js'
 
 const OTHER_SITE = 'https://evil.example'
 
@@ -50,6 +57,19 @@ describe('state-changing requests from another site', () => {
 
     expect(res.status).toBe(403)
     expect(send).not.toHaveBeenCalled()
+  })
+
+  // A page on another site must not be able to end someone's session.
+  it('rejects a sign-out, leaving the session working', async () => {
+    const cookie = await signInNewUser()
+
+    const res = await post('/api/auth/sign-out', {
+      headers: { cookie, origin: OTHER_SITE, 'sec-fetch-site': 'cross-site' },
+      body: '',
+    })
+
+    expect(res.status).toBe(403)
+    expect((await getMe(cookie)).status).toBe(200)
   })
 
   it('rejects a form post to a route outside Better Auth', async () => {
