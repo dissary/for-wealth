@@ -6,6 +6,9 @@
   "exports": {
     ".": {
       "types": "./src/app.ts"
+    },
+    "./auth": {
+      "types": "./src/auth.ts"
     }
   },
   "scripts": {
@@ -14,11 +17,13 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "node --env-file-if-exists=.env node_modules/drizzle-kit/bin.cjs migrate"
+    "db:migrate": "node --env-file-if-exists=.env node_modules/drizzle-kit/bin.cjs migrate",
+    "auth:generate": "node --env-file-if-exists=.env node_modules/auth/dist/index.mjs generate --config src/auth.ts --output src/db/schema/auth.ts --yes"
   },
   "dependencies": {
     "@for-wealth/shared": "workspace:*",
     "@hono/node-server": "^2.1.5",
+    "better-auth": "catalog:",
     "drizzle-orm": "^0.45.4",
     "hono": "catalog:",
     "pg": "^8.23.1",
@@ -28,6 +33,7 @@
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.13.3",
     "@types/pg": "^8.23.1",
+    "auth": "catalog:",
     "drizzle-kit": "^0.31.11",
     "eslint": "^10.10.0",
     "globals": "^17.12.0",
