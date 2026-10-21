@@ -194,3 +194,12 @@ Each slice works all the way from the database to the screen.
 ## Design
 
 Use the `frontend-design` skill when building the UI. Replace shadcn/ui's default theme (colours, corner radius, font). Use one accent colour, and save red and green for over-Budget and under-Budget. For layout ideas, look at real finance apps (Copilot Money, Monarch, Lunch Money).
+
+The theme (slice 1, decided 2026-10-21) lives as tokens in `apps/web/src/index.css`. Components use the tokens, never their own colours.
+
+- **Accent**: batik indigo (`#3e4eb3` light, `#92a6f1` dark), for primary actions, links and focus. Neutrals are tinted with the same hue. Indigo is far from both red and green, so it never reads as a Budget signal.
+- **Red and green**: the `over-budget` and `under-budget` tokens only. So `destructive` (delete buttons, invalid fields) is ink, not red: the wording ("Delete Transaction") and a confirmation step carry the warning, which also works for people who can't tell red from green. For the same reason, an invalid form field always says what's wrong in words, not only with its border.
+- **Type**: Instrument Sans, bundled from npm. Headings use its width axis at 85% (narrower). All digits are tabular (the same width), so amounts line up.
+- **Corners**: 0.375rem base radius, tighter than shadcn's default.
+- **Light and dark**: follows the device setting, in CSS only. A manual switch can come later if wanted.
+- **Checked by tests** (`apps/web/test/`): text contrast meets WCAG AA in both modes, red and green appear only in the Budget tokens, components hard-code no colours, and the stylesheet loads nothing from another address.
