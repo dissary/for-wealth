@@ -2,6 +2,8 @@
 
 Track, plan and understand your spending, day by day, week by week, month by month.
 
+**Status:** early. Only the walking skeleton exists so far: the home page shows whether the browser can reach the API and the API can reach Postgres. Features arrive slice by slice, in the build order in [docs/v1-spec.md](docs/v1-spec.md).
+
 ## Layout
 
 ```
@@ -51,6 +53,19 @@ Needs Node 22.12 or later, pnpm (the version in `package.json` → `packageManag
 
    Open <http://localhost:5173>. The home page says "API connected" when the API can reach Postgres. Vite forwards `/api/*` to the API on port 3000, so the browser only ever talks to one address.
 
+## Everyday use
+
+Setup is a one-off. After that:
+
+| To | Run |
+|---|---|
+| Start working | `podman compose up -d`, then `pnpm dev` |
+| Stop the app | `Ctrl+C` in the terminal running `pnpm dev` |
+| Stop Postgres | `podman compose stop` (your data is kept) |
+| Catch up after pulling new changes | `pnpm install`, then `pnpm db:migrate` |
+
+The API's log, including any errors, appears in the terminal running `pnpm dev`. Once sign-up exists, emails such as verification links print there too, because the app sends no real email until slice 7 of the spec.
+
 ## Database changes
 
 Edit the schema in `apps/api/src/db/schema/`, then:
@@ -78,8 +93,6 @@ pnpm --filter @for-wealth/api test test/health.test.ts
 
 If the `for_wealth_test` database is missing because the volume was created before `db/init` existed, either create it by hand (`podman compose exec -T db createdb -U for_wealth for_wealth_test`) or reset the volume with `podman compose down -v`. Resetting deletes all local data.
 
-<<<<<<< Updated upstream
-=======
 ### CI
 
 GitHub Actions runs the same checks, plus `pnpm build`, on every push to `main` and every pull request ([.github/workflows/ci.yml](.github/workflows/ci.yml)). The API tests run against a fresh Postgres 18 container. The pnpm version comes from `packageManager` in `package.json`, and Node from `engines.node`, so change them there, not in the workflow. Because `engines.node` is a minimum, CI uses the newest Node that satisfies it.
@@ -96,7 +109,6 @@ The workflow's actions are pinned to a full commit SHA. To update one, use the S
 - **Postgres won't start because port 5432 is in use.** Another Postgres is already running on this machine. Stop it, then run `podman compose up -d` again.
 - **You want a clean database.** Run `podman compose down -v`, `podman compose up -d`, then `pnpm db:migrate`. This deletes all local data.
 
->>>>>>> Stashed changes
 ## Dependencies
 
 Set in `pnpm-workspace.yaml`:
