@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import app from '../src/app.js'
 import { pool } from '../src/db/client.js'
-import { signUpTiming } from '../src/sign-up-timing.js'
+import { responseFloor } from '../src/response-floor.js'
 import {
   APP_ORIGIN,
   cookiesFrom,
@@ -110,7 +110,7 @@ describe('response time', () => {
   // A new email also writes the user and their account, an existing one
   // doesn't. Holding every answer to a floor hides that difference.
   it('is at least the floor, whether or not the email already has an account', async () => {
-    signUpTiming.minimumMs = 300
+    responseFloor.minimumMs = 300
     const durations: number[] = []
 
     for (const attempt of ['new email', 'same email again']) {
@@ -124,7 +124,7 @@ describe('response time', () => {
   })
 
   it('is at least the floor for a rejected signup too', async () => {
-    signUpTiming.minimumMs = 300
+    responseFloor.minimumMs = 300
     const start = performance.now()
 
     await signUp({ ...NEW_USER, password: 'short' })
