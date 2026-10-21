@@ -93,6 +93,14 @@ pnpm --filter @for-wealth/api test test/health.test.ts
 
 If the `for_wealth_test` database is missing because the volume was created before `db/init` existed, either create it by hand (`podman compose exec -T db createdb -U for_wealth for_wealth_test`) or reset the volume with `podman compose down -v`. Resetting deletes all local data.
 
+### CI
+
+GitHub Actions runs the same checks, plus `pnpm build`, on every push to `main` and every pull request ([.github/workflows/ci.yml](.github/workflows/ci.yml)). The API tests run against a fresh Postgres 18 container. The pnpm version comes from `packageManager` in `package.json`, and Node from `engines.node`, so change them there, not in the workflow. Because `engines.node` is a minimum, CI uses the newest Node that satisfies it.
+
+CI must pass before anything merges to `main`. Enforcing that is a repo setting: protect `main` with a branch protection rule or ruleset that requires the `check` status check.
+
+The workflow's actions are pinned to a full commit SHA. To update one, use the SHA of the commit the new release's tag points to (for an annotated tag this differs from the tag's own SHA; `gh api repos/OWNER/REPO/commits/TAG --jq .sha` gives the commit), and update the version comment beside it.
+
 ## Troubleshooting
 
 - **The home page says "API not connected".** The API isn't running or has crashed. Check the terminal running `pnpm dev` for its error, and check Postgres is up with `podman compose ps`.

@@ -1,0 +1,64 @@
+# Lint, type-check, build and test every push to main and every pull request.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Read-only token. Nothing in this workflow writes to the repo.
+permissions:
+  contents: read
+
+# A new push to a pull request cancels its older run. Runs on main always
+# finish, so every commit there gets a result.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    # Same image as compose.yaml. Starts with only the test database, which
+    # the API tests migrate themselves (apps/api/test/global-setup.ts).
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: for_wealth
+          POSTGRES_PASSWORD: for_wealth # test only; the container lives for this job
+          POSTGRES_DB: for_wealth_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U for_wealth -d for_wealth_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      TEST_DATABASE_URL: postgres://for_wealth:for_wealth@localhost:5432/for_wealth_test
+
+    # Actions are pinned to a full commit SHA, because a tag can be moved to
+    # different code. The comment names the release the SHA belongs to.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # No version input: reads `packageManager` from package.json.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      # Reads `engines.node` from package.json.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm build
+      - run: pnpm test
