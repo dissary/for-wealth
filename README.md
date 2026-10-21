@@ -78,6 +78,25 @@ pnpm --filter @for-wealth/api test test/health.test.ts
 
 If the `for_wealth_test` database is missing because the volume was created before `db/init` existed, either create it by hand (`podman compose exec -T db createdb -U for_wealth for_wealth_test`) or reset the volume with `podman compose down -v`. Resetting deletes all local data.
 
+<<<<<<< Updated upstream
+=======
+### CI
+
+GitHub Actions runs the same checks, plus `pnpm build`, on every push to `main` and every pull request ([.github/workflows/ci.yml](.github/workflows/ci.yml)). The API tests run against a fresh Postgres 18 container. The pnpm version comes from `packageManager` in `package.json`, and Node from `engines.node`, so change them there, not in the workflow. Because `engines.node` is a minimum, CI uses the newest Node that satisfies it.
+
+CI must pass before anything merges to `main`. Enforcing that is a repo setting: protect `main` with a branch protection rule or ruleset that requires the `check` status check.
+
+The workflow's actions are pinned to a full commit SHA. To update one, use the SHA of the commit the new release's tag points to (for an annotated tag this differs from the tag's own SHA; `gh api repos/OWNER/REPO/commits/TAG --jq .sha` gives the commit), and update the version comment beside it.
+
+## Troubleshooting
+
+- **The home page says "API not connected".** The API isn't running or has crashed. Check the terminal running `pnpm dev` for its error, and check Postgres is up with `podman compose ps`.
+- **The API stops with `Invalid environment`.** A value in `apps/api/.env` is missing or wrong; the message names it. A blank `BETTER_AUTH_SECRET` means the file was copied from the example but never given a secret: run the `sed` line from step 3.
+- **The API stops saying `.env` was not found.** Step 3 was skipped.
+- **Postgres won't start because port 5432 is in use.** Another Postgres is already running on this machine. Stop it, then run `podman compose up -d` again.
+- **You want a clean database.** Run `podman compose down -v`, `podman compose up -d`, then `pnpm db:migrate`. This deletes all local data.
+
+>>>>>>> Stashed changes
 ## Dependencies
 
 Set in `pnpm-workspace.yaml`:
