@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    // No DOM and no Node types: code here runs in both the browser and the
+    // API, so using `window`, `process` or a Node module is a type error.
+    "lib": ["ES2023"],
+    "types": [],
+    // NodeNext rules (relative imports end in .js) work for both the API,
+    // which uses NodeNext, and Vite.
+    "module": "nodenext",
+    "strict": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+
+    /* Linting */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"]
+}
