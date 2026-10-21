@@ -4,9 +4,9 @@ import { createFileRoute, Link, redirect } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
-import { Tagline, Wordmark } from '@/components/brand'
 import { DevEmailNote } from '@/components/dev-email-note'
 import { NewVerificationLinkForm } from '@/components/new-verification-link'
+import { SignedOutPage } from '@/components/signed-out-page'
 import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -43,11 +43,7 @@ function SignIn() {
   const [unverified, setUnverified] = useState<string>()
 
   return (
-    <main className="mx-auto grid min-h-svh w-full max-w-5xl content-center gap-12 px-6 py-12 md:grid-cols-[1fr_24rem] md:gap-20">
-      <header className="flex flex-col gap-4">
-        <Wordmark />
-        <Tagline className="max-w-[12ch] text-5xl leading-[0.95] md:text-7xl" />
-      </header>
+    <SignedOutPage>
       <div className="flex flex-col gap-8">
         {error && <BrokenLink error={error} />}
         {unverified ? (
@@ -62,7 +58,7 @@ function SignIn() {
           />
         )}
       </div>
-    </main>
+    </SignedOutPage>
   )
 }
 
@@ -127,7 +123,15 @@ function SignInForm({
           </Field>
 
           <Field data-invalid={!!errors.password}>
-            <FieldLabel htmlFor="password">Password</FieldLabel>
+            <div className="flex items-baseline justify-between gap-4">
+              <FieldLabel htmlFor="password">Password</FieldLabel>
+              <Link
+                to="/forgot-password"
+                className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <Input
               id="password"
               type="password"

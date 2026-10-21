@@ -5,7 +5,7 @@ import { auth } from './auth.js'
 import { env } from './env.js'
 import { health } from './routes/health.js'
 import { me } from './routes/me.js'
-import { signUpResponseFloor } from './sign-up-timing.js'
+import { holdToResponseFloor } from './response-floor.js'
 
 // Built apart from the server in index.ts, so tests can call app.request()
 // without starting one. Chain .route() calls so the RPC client sees the types.
@@ -17,7 +17,8 @@ const app = new Hono()
   // never gives; Better Auth's own origin check and SameSite=Lax cookies sit
   // behind both.
   .use(csrf({ origin: new URL(env.BETTER_AUTH_URL).origin }))
-  .use('/auth/sign-up/email', signUpResponseFloor)
+  .use('/auth/sign-up/email', holdToResponseFloor)
+  .use('/auth/request-password-reset', holdToResponseFloor)
   // Better Auth's routes live under /api/auth (its default basePath).
   .on(['GET', 'POST'], '/auth/*', (c) => auth.handler(c.req.raw))
   .route('/health', health)

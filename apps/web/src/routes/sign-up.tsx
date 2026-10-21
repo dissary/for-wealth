@@ -10,9 +10,9 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Tagline, Wordmark } from '@/components/brand'
 import { DevEmailNote } from '@/components/dev-email-note'
 import { SendLinkAgainButton } from '@/components/new-verification-link'
+import { SignedOutPage } from '@/components/signed-out-page'
 import { Button } from '@/components/ui/button'
 import {
   Field,
@@ -45,13 +45,9 @@ function SignUp() {
   const [sentTo, setSentTo] = useState<string>()
 
   return (
-    <main className="mx-auto grid min-h-svh w-full max-w-5xl content-center gap-12 px-6 py-12 md:grid-cols-[1fr_24rem] md:gap-20">
-      <header className="flex flex-col gap-4">
-        <Wordmark />
-        <Tagline className="max-w-[12ch] text-5xl leading-[0.95] md:text-7xl" />
-      </header>
+    <SignedOutPage>
       {sentTo ? <CheckYourEmail email={sentTo} /> : <SignUpForm onSent={setSentTo} />}
-    </main>
+    </SignedOutPage>
   )
 }
 
