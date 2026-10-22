@@ -7,7 +7,7 @@ A personal money app for recording income and spending, seeing totals over time,
 ### Money movement
 
 **Transaction**:
-A single dated record of money coming in or going out, with an amount and a Category.
+A single dated record of money coming in or going out, with an amount and a Category. Its Category alone decides whether it is Income or an Expense; the amount is always positive.
 _Avoid_: Entry, record, item
 
 **Income**:
