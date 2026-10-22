@@ -6,6 +6,7 @@ import { users } from '../src/db/schema/index.js'
 import { mailer } from '../src/email.js'
 import { env } from '../src/env.js'
 import { responseFloor } from '../src/response-floor.js'
+import { writeLimit } from '../src/write-limit.js'
 
 // The address the browser uses (vitest.config.ts sets it).
 export const APP_ORIGIN = new URL(env.BETTER_AUTH_URL).origin
@@ -23,11 +24,13 @@ export type MailerSpy = MockInstance<typeof mailer.send>
 // For each test's beforeEach: empties every table and replaces the mailer, so
 // nothing prints and the emails can be read from the returned spy.
 // verifications has no foreign key to users, so the cascade alone would leave
-// its rows behind. The response-time floor is off unless a test sets it.
+// its rows behind. The response-time floor is off unless a test sets it, and
+// the write limit starts with no writes counted.
 export async function startFresh(): Promise<MailerSpy> {
   await db.execute(sql`truncate table users, verifications cascade`)
   vi.restoreAllMocks()
   responseFloor.minimumMs = 0
+  writeLimit.reset()
   return vi.spyOn(mailer, 'send').mockResolvedValue()
 }
 
@@ -102,4 +105,19 @@ export async function signInNewUser(user: typeof NEW_USER = NEW_USER) {
 
 export function getCategories(cookie?: string) {
   return app.request('/api/categories', { headers: cookie ? { cookie } : {} })
+}
+
+export function postTransaction(cookie: string | undefined, body: unknown) {
+  return app.request('/api/transactions', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: APP_ORIGIN, ...(cookie ? { cookie } : {}) },
+    body: JSON.stringify(body),
+  })
+}
+
+// One day's Transactions and totals.
+export function getDay(cookie: string | undefined, date: string) {
+  return app.request(`/api/transactions?period=day&date=${encodeURIComponent(date)}`, {
+    headers: cookie ? { cookie } : {},
+  })
 }

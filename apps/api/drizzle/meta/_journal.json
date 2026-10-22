@@ -15,6 +15,13 @@
       "when": 1792682705560,
       "tag": "0001_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792683635056,
+      "tag": "0002_transactions",
+      "breakpoints": true
     }
   ]
 }

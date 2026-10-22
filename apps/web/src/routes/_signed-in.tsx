@@ -1,9 +1,6 @@
-import { useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, Outlet, redirect, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
+import { createFileRoute, Link, Outlet, redirect } from '@tanstack/react-router'
 import { Wordmark } from '@/components/brand'
-import { Button } from '@/components/ui/button'
-import { authClient } from '@/lib/auth-client'
+import { UserMenu } from '@/components/user-menu'
 import { meQuery } from '@/lib/me'
 
 // Every page that needs a signed-in user lives under this layout (in
@@ -26,46 +23,23 @@ function SignedInLayout() {
   const { me } = Route.useRouteContext()
 
   return (
-    <div className="mx-auto flex min-h-svh w-full max-w-5xl flex-col px-6">
-      <header className="flex items-center justify-between gap-4 border-b py-4">
-        <Wordmark />
-        <div className="flex items-center gap-4">
-          <p className="text-sm">
-            <span className="font-medium">{me.name}</span>
-            <span className="text-muted-foreground"> · {me.currency}</span>
-          </p>
-          <SignOutButton />
+    <div className="mx-auto flex min-h-svh w-full max-w-3xl flex-col px-4 sm:px-6">
+      <header className="flex items-center justify-between gap-4 border-b py-3">
+        <div className="flex items-center gap-6">
+          <Wordmark />
+          <nav aria-label="Main">
+            <Link
+              to="/transactions"
+              className="rounded-md text-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+              activeProps={{ className: 'font-medium text-foreground', 'aria-current': 'page' }}
+            >
+              Transactions
+            </Link>
+          </nav>
         </div>
+        <UserMenu me={me} />
       </header>
       <Outlet />
-    </div>
-  )
-}
-
-function SignOutButton() {
-  const queryClient = useQueryClient()
-  const navigate = useNavigate()
-  const [state, setState] = useState<'idle' | 'signing-out' | 'failed'>('idle')
-
-  async function signOut() {
-    setState('signing-out')
-    const { error } = await authClient.signOut()
-    if (error) return setState('failed')
-    // Nothing of this user's may stay in memory for whoever signs in next.
-    queryClient.clear()
-    await navigate({ to: '/sign-in' })
-  }
-
-  return (
-    <div className="flex items-center gap-2">
-      {state === 'failed' && (
-        <p role="alert" className="text-sm">
-          Couldn't sign out. Try again.
-        </p>
-      )}
-      <Button variant="outline" size="sm" onClick={signOut} disabled={state === 'signing-out'}>
-        {state === 'signing-out' ? 'Signing out…' : 'Sign out'}
-      </Button>
     </div>
   )
 }

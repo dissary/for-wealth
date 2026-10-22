@@ -62,19 +62,20 @@ Decided on 2026-10-22, for slice 2.
 
 - A Transaction is Income or an Expense because of its Category; it has no type of its own ([ADR 0005](adr/0005-category-decides-income-or-expense.md)). Moving it to a Category of the other kind changes which it is.
 - **Amount**: always positive, from 1 minor unit up to 100,000,000,000 minor units (RM1,000,000,000.00), stored as a Postgres `bigint`. Zero is not allowed.
-- **Typing an amount**: "12.50" and "1,234.50" both work; commas are only thousands separators. More decimal places than the currency has ("12.505" in MYR, "1500.5" in JPY) is refused with a message, never rounded.
+- **Typing an amount**: "12.50" and "1,234.50" both work; commas are only thousands separators, so they must fall every three digits ("12,50" is refused rather than read as 12.50). More decimal places than the currency has ("12.505" in MYR, "1500.5" in JPY) is refused with a message, never rounded.
 - **Date**: from 2000-01-01 up to one year after today, with today taken in the user's time zone. The field starts on today, or on the day being viewed when the Transactions page shows a single past or future Day.
 - **Note**: optional, at most 200 characters, trimmed; a blank note is stored as no note.
 - **Refunds**: edit the original Expense down, or delete it when the refund is in full. Past months' totals change accordingly, because that is what was really spent.
 - **Deleting**: after a confirmation step, the Transaction is gone for good. No soft delete and no undo.
 - **Editing**: whichever save comes last wins. No conflict warning.
-- **Shown as**: Income amounts carry a "+" ("+RM3,000.00"); Expense amounts carry no sign ("RM12.50"). Every row shows its Category's name. Red and green stay reserved for Budgets.
-- Dates and money are formatted one way for everyone in v1, English (Malaysia): "Wed, 22 Oct 2026", "RM1,234.50". A setting can come later.
+- **Shown as**: Income amounts carry a "+" ("+RM3,000.00"); Expense amounts carry no sign ("RM12.50"). Every row shows its Category's name, and its note when it has one. A Period's Income and Expense totals carry no sign, as their labels say which is which. Red and green stay reserved for Budgets.
+- Dates and money are formatted one way for everyone in v1, English (Malaysia): "Thu, 22 Oct 2026", "RM1,234.50". A setting can come later. Intl's en-MY writes "RM 1,234.50"; the space after a symbol is dropped, but kept (non-breaking) after a three-letter code: "SGD 1,234.50".
+- **Category**: a new Transaction can't be filed under an archived Category. The API answers 404, the same as for another user's Category or one that doesn't exist.
 
 ### The Transactions page
 
 - Lives at `/transactions`. Until the dashboard arrives in slice 3, `/` sends signed-in users there, and it opens on today as a Day.
-- At the top: the Period's label ("Wed, 22 Oct 2026", "20–26 Oct 2026", "October 2026"), ‹ › to step back and forward, and a Today button. Below it, the Period's Income total and Expense total. No net figure, so nothing competes with **Remaining**.
+- At the top: the Period's label ("Thu, 22 Oct 2026", "20–26 Oct 2026", "October 2026"), ‹ › to step back and forward, and a Today button. Below it, the Period's Income total and Expense total. No net figure, so nothing competes with **Remaining**.
 - Then the Transactions, newest date first, grouped under date headings; within a day, the most recently added first.
 - A Category filter. With a filter on, the totals cover only that Category.
 - The Period, its date and the filter live in the address bar (`/transactions?period=week&date=2026-10-22&category=<id>`), so back, refresh and bookmarks return to the same view. Switching between Day, Week and Month keeps the date. ‹ › stop at the same bounds as a Transaction's date.
@@ -201,7 +202,7 @@ Before inviting friends (slice 7):
 - Every app table's `user_id` references `users` with `ON DELETE CASCADE`. "Delete my account" removes the user and all their data in one delete.
 - A Transaction's Category must belong to the same user, enforced by the database as well as the API: the foreign key covers both `user_id` and `category_id`.
 - An ID that belongs to someone else gets **404**, exactly like an ID that doesn't exist, so nobody can probe for other users' IDs.
-- Adding, editing and deleting user data is limited to 60 requests a minute per user (counters in memory until slice 7). Requests to `/api/*` larger than 16 KB are refused before they are read.
+- Adding, editing and deleting user data is limited to 60 requests a minute per user (counters in memory until slice 7). Requests to `/api/*` larger than 16 KB are refused before they are read. As built in slice 2 (`apps/api/src/write-limit.ts`): a sliding window, so no 120-request burst can straddle a minute boundary; every write counts, invalid and refused ones included; over the limit gives 429 with `Retry-After`. Each app router that writes user data adds `.use(limitWrites)` after `requireSession`; Better Auth's routes keep their own limits.
 - HTTPS only. Secrets go in environment variables and are never committed.
 - Environment variables are checked with Zod at startup. The API refuses to start if `BETTER_AUTH_SECRET` is missing or shorter than 32 characters, and never falls back to Better Auth's default secret.
 - Passwords: at least 10 characters, at most 128, and no rules about character types. (Lowered from 12 on 2026-10-21, by the author's choice. That is still above OWASP's minimum of 8, and the breach check below catches common short passwords.) Passwords found in known data breaches are rejected (Better Auth's `haveIBeenPwned` plugin). Resetting the password signs the user out everywhere.
