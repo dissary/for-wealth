@@ -8,6 +8,7 @@ import {
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { haveIBeenPwned } from 'better-auth/plugins'
+import { writeStarterCategories } from './categories.js'
 import { db } from './db/client.js'
 import * as schema from './db/schema/auth.js'
 import { sendInBackground } from './email.js'
@@ -89,6 +90,23 @@ export const auth = betterAuth({
         subject: 'Verify your email for For Wealth',
         text: `Open this link to verify your email and sign in:\n${url}`,
       })
+    },
+  },
+
+  databaseHooks: {
+    user: {
+      create: {
+        // Runs once the sign-up transaction has committed, still inside the
+        // request and so under its response floor. A failure must not change
+        // the answer, or a new email would get an error that a known one
+        // doesn't. It is logged, and loading the Categories writes the
+        // starter sets later.
+        after: async (user) => {
+          await writeStarterCategories(user.id).catch((error: unknown) => {
+            console.error('Starter Categories could not be written at sign-up', error)
+          })
+        },
+      },
     },
   },
 

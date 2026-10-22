@@ -87,7 +87,8 @@ Decided on 2026-10-22, for slice 2.
 - Every Category is either Income or Expense. Budgets apply only to Expense Categories.
 - Categories are one level deep (no subcategories).
 - Deleting a Category **archives** it: it's hidden from pickers, but old Transactions keep it and past totals don't change.
-- The starter sets are written when the user is created, by Better Auth's after-create hook (which runs once the sign-up transaction has committed). As a backstop, loading Categories for a user who has none at all, archived included, writes the starter sets then. Both paths call one function that is safe to run twice. A user who archives everything does not get the starter sets back.
+- The starter sets are written when the user is created, by Better Auth's after-create hook (which runs once the sign-up transaction has committed). As a backstop, loading Categories for a user who has none at all, archived included, writes the starter sets then. Both paths call one function that is safe to run twice, even at the same moment (it locks the user's row while checking). A user who archives everything does not get the starter sets back. If writing them at sign-up fails, sign-up still answers as usual, because an error only for a new email would show which emails have accounts; the failure is logged and the first load writes them.
+- `GET /api/categories` returns the user's Categories that aren't archived as `{ income: [...], expense: [...] }`, each list in position order, each Category as `{ id, name, kind }`.
 - Each Category stores its position. The starter sets keep the order listed below, with "Other" last. Adding, renaming, archiving and reordering Categories come in Settings (slice 6); slice 2 has the starter sets only.
 - Starter sets:
   - **Income:** Salary, Bonus, Side income, Other

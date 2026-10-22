@@ -99,3 +99,7 @@ export async function signInNewUser(user: typeof NEW_USER = NEW_USER) {
   if (!signedIn.ok) throw new Error(`Sign-in failed: ${signedIn.status}`)
   return cookiesFrom(signedIn)
 }
+
+export function getCategories(cookie?: string) {
+  return app.request('/api/categories', { headers: cookie ? { cookie } : {} })
+}
