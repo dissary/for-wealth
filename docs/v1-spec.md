@@ -56,11 +56,39 @@ The author is the first user. Once the foundation works, it goes to friends and 
 
 An Expense is dated when the purchase is made, whatever it was paid with. Credit card bill payments, e-wallet top-ups and transfers to savings are **not recorded at all**. See [ADR 0001](adr/0001-expenses-recognised-at-purchase.md).
 
+### Transactions
+
+Decided on 2026-10-22, for slice 2.
+
+- A Transaction is Income or an Expense because of its Category; it has no type of its own ([ADR 0005](adr/0005-category-decides-income-or-expense.md)). Moving it to a Category of the other kind changes which it is.
+- **Amount**: always positive, from 1 minor unit up to 100,000,000,000 minor units (RM1,000,000,000.00), stored as a Postgres `bigint`. Zero is not allowed.
+- **Typing an amount**: "12.50" and "1,234.50" both work; commas are only thousands separators. More decimal places than the currency has ("12.505" in MYR, "1500.5" in JPY) is refused with a message, never rounded.
+- **Date**: from 2000-01-01 up to one year after today, with today taken in the user's time zone. The field starts on today, or on the day being viewed when the Transactions page shows a single past or future Day.
+- **Note**: optional, at most 200 characters, trimmed; a blank note is stored as no note.
+- **Refunds**: edit the original Expense down, or delete it when the refund is in full. Past months' totals change accordingly, because that is what was really spent.
+- **Deleting**: after a confirmation step, the Transaction is gone for good. No soft delete and no undo.
+- **Editing**: whichever save comes last wins. No conflict warning.
+- **Shown as**: Income amounts carry a "+" ("+RM3,000.00"); Expense amounts carry no sign ("RM12.50"). Every row shows its Category's name. Red and green stay reserved for Budgets.
+- Dates and money are formatted one way for everyone in v1, English (Malaysia): "Wed, 22 Oct 2026", "RM1,234.50". A setting can come later.
+
+### The Transactions page
+
+- Lives at `/transactions`. Until the dashboard arrives in slice 3, `/` sends signed-in users there, and it opens on today as a Day.
+- At the top: the Period's label ("Wed, 22 Oct 2026", "20–26 Oct 2026", "October 2026"), ‹ › to step back and forward, and a Today button. Below it, the Period's Income total and Expense total. No net figure, so nothing competes with **Remaining**.
+- Then the Transactions, newest date first, grouped under date headings; within a day, the most recently added first.
+- A Category filter. With a filter on, the totals cover only that Category.
+- The Period, its date and the filter live in the address bar (`/transactions?period=week&date=2026-10-22&category=<id>`), so back, refresh and bookmarks return to the same view. Switching between Day, Week and Month keeps the date. ‹ › stop at the same bounds as a Transaction's date.
+- The API accepts only a Day, a Week or a Month, never an arbitrary range, and returns every Transaction in it without paging.
+- Adding and editing happen in a dialog over the page (a sheet on a phone). An Expense / Income switch, starting on Expense, chooses which Categories the picker shows. Saving closes the dialog and refreshes the list.
+- Every signed-in page has a header: the app name, a Transactions link, and a menu with the user's name holding their email, currency, time zone and Sign out.
+
 ### Categories
 
 - Every Category is either Income or Expense. Budgets apply only to Expense Categories.
 - Categories are one level deep (no subcategories).
 - Deleting a Category **archives** it: it's hidden from pickers, but old Transactions keep it and past totals don't change.
+- The starter sets are written when the user is created, by Better Auth's after-create hook (which runs once the sign-up transaction has committed). As a backstop, loading Categories for a user who has none at all, archived included, writes the starter sets then. Both paths call one function that is safe to run twice. A user who archives everything does not get the starter sets back.
+- Each Category stores its position. The starter sets keep the order listed below, with "Other" last. Adding, renaming, archiving and reordering Categories come in Settings (slice 6); slice 2 has the starter sets only.
 - Starter sets:
   - **Income:** Salary, Bonus, Side income, Other
   - **Expense:** Food, Transport, Housing, Utilities, Bills & Subscriptions, Shopping, Health, Entertainment, Family, Other
@@ -159,7 +187,7 @@ One service at one address: the API serves the built web app, and data lives und
 
 Before inviting friends (slice 7):
 
-- Rate-limit counters are stored in the database, not in memory, so they survive restarts.
+- Rate-limit counters (Better Auth's and the per-user write limit) are stored in the database, not in memory, so they survive restarts.
 - The client IP used for rate limiting is read from the host's proxy header, configured so it can't be faked.
 - Migrations run as a separate database role. The app's role can read and write data but can't change the schema.
 - A strict Content-Security-Policy on the served web app.
@@ -170,6 +198,9 @@ Before inviting friends (slice 7):
 - All data is stored in Postgres behind our own API ([ADR 0002](adr/0002-server-backed-from-day-one.md)).
 - **Every table holding user data has a `userId`, and every query is scoped to it.** Make the user ID a required parameter so that forgetting it is a type error. One user reading another's data is the biggest risk in this app. This is enforced in the API, not with Postgres row-level security ([ADR 0004](adr/0004-user-data-isolation-in-api.md)).
 - Every app table's `user_id` references `users` with `ON DELETE CASCADE`. "Delete my account" removes the user and all their data in one delete.
+- A Transaction's Category must belong to the same user, enforced by the database as well as the API: the foreign key covers both `user_id` and `category_id`.
+- An ID that belongs to someone else gets **404**, exactly like an ID that doesn't exist, so nobody can probe for other users' IDs.
+- Adding, editing and deleting user data is limited to 60 requests a minute per user (counters in memory until slice 7). Requests to `/api/*` larger than 16 KB are refused before they are read.
 - HTTPS only. Secrets go in environment variables and are never committed.
 - Environment variables are checked with Zod at startup. The API refuses to start if `BETTER_AUTH_SECRET` is missing or shorter than 32 characters, and never falls back to Better Auth's default secret.
 - Passwords: at least 10 characters, at most 128, and no rules about character types. (Lowered from 12 on 2026-10-21, by the author's choice. That is still above OWASP's minimum of 8, and the breach check below catches common short passwords.) Passwords found in known data breaches are rejected (Better Auth's `haveIBeenPwned` plugin). Resetting the password signs the user out everywhere.
@@ -184,6 +215,7 @@ Before inviting friends (slice 7):
 
 - Vitest tests in `packages/shared` for the money and date logic: Period boundaries, time zones, Free to Spend, Remaining, Budget usage, Recurring due dates (including day 31).
 - API integration tests against a real Postgres, including **"user A cannot read or change user B's data"** for every endpoint that touches user data.
+- Slice 2 tests: a new user has the starter sets, and a user with none gets them on first load; amounts outside the bounds or with too many decimal places are refused; dates outside the bounds (in the user's time zone) are refused; Day, Week and Month totals; a Transaction can't point at another user's Category (the API refuses it, and the database refuses it too); another user's Transaction or Category gives 404 for read, edit, delete and filter; the 61st write in a minute is refused; a request over 16 KB is refused.
 - API tests use a separate `for_wealth_test` database, run one file at a time (`fileParallelism: false`) and empty the tables between tests. A test signs in by signing up, marking the email verified in the database, then signing in.
 - Slice 1 auth tests: no session gives 401, sign-in before verifying gives 403, a verified sign-in works, currency can't be changed, a breached or short password is rejected, a cross-site POST is rejected, the verification email is sent, a signed-out session's cookie gives 401, a session in use is extended, and two users each see only their own details. Password reset: an unknown email gets the same answer as a known one, a valid link resets the password and the new one signs in while the old one doesn't, a session from before the reset gets 401, a used, expired or earlier link is refused, a weak new password is refused, and a failure while saving the password changes nothing.
 
