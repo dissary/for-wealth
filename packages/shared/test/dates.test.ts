@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDayLabel, todayIn } from '../src/index.js'
+import { firstDayOf, formatDayLabel, isCalendarMonth, monthOf, todayIn } from '../src/index.js'
 
 describe('todayIn', () => {
   // 00:30 on the 23rd in Kuala Lumpur (UTC+8) is still the 22nd in UTC.
@@ -21,5 +21,20 @@ describe('formatDayLabel', () => {
   // The label is for a calendar date, so the device's zone can't shift it.
   it('is the same date whatever the zone', () => {
     expect(formatDayLabel('2000-01-01')).toBe('Sat, 1 Jan 2000')
+  })
+})
+
+describe('months', () => {
+  it.each(['2026-10', '2000-01', '2026-12'])('reads %s as a month', (value) => {
+    expect(isCalendarMonth(value)).toBe(true)
+  })
+
+  it.each(['2026-13', '2026-00', '2026-1', '2026-10-01', 'October'])('refuses %s as a month', (value) => {
+    expect(isCalendarMonth(value)).toBe(false)
+  })
+
+  it('finds the month holding a date and that month’s first day', () => {
+    expect(monthOf('2026-10-31')).toBe('2026-10')
+    expect(firstDayOf('2026-10')).toBe('2026-10-01')
   })
 })

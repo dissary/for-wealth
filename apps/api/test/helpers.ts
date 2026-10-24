@@ -141,3 +141,10 @@ export function deleteTransaction(cookie: string | undefined, id: string) {
     headers: { origin: APP_ORIGIN, ...(cookie ? { cookie } : {}) },
   })
 }
+
+// One month's Dashboard, for a query such as { month: '2026-10' }.
+export function getDashboard(cookie: string | undefined, query: Record<string, string>) {
+  return app.request(`/api/dashboard?${new URLSearchParams(query)}`, {
+    headers: cookie ? { cookie } : {},
+  })
+}

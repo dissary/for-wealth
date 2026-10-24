@@ -10,17 +10,18 @@ import {
   type Period,
   periodSchema,
   stepPeriod,
-  todayIn,
   transactionDateSchema,
 } from '@for-wealth/shared'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link, redirect } from '@tanstack/react-router'
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { z } from 'zod'
+import { Total } from '@/components/total'
 import { TransactionDialog } from '@/components/transaction-dialog'
 import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOptGroup, NativeSelectOption } from '@/components/ui/native-select'
+import { useToday } from '@/hooks/use-today'
 import { categoriesQuery } from '@/lib/categories'
 import { type Listing, periodQuery, type Transaction } from '@/lib/transactions'
 
@@ -138,17 +139,6 @@ function TransactionsPage() {
       />
     </main>
   )
-}
-
-// Checked every minute, so a page left open past midnight moves on to the
-// new day.
-function useToday(timeZone: string) {
-  const [today, setToday] = useState(() => todayIn(timeZone))
-  useEffect(() => {
-    const timer = setInterval(() => setToday(todayIn(timeZone)), 60_000)
-    return () => clearInterval(timer)
-  }, [timeZone])
-  return today
 }
 
 // ‹ or ›, which stop at the Periods holding the bounds of a Transaction's date.
@@ -341,14 +331,5 @@ function TransactionList({
         </li>
       ))}
     </ul>
-  )
-}
-
-function Total({ label, amount }: { label: string; amount: string }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <dt className="text-sm text-muted-foreground">{label}</dt>
-      <dd className="text-xl font-medium tabular-nums">{amount}</dd>
-    </div>
   )
 }
