@@ -31,3 +31,5 @@ export function periodQuery(view: View) {
 }
 
 export type Listing = NonNullable<Awaited<ReturnType<typeof fetchPeriod>>>
+
+export type Transaction = Listing['transactions'][number]

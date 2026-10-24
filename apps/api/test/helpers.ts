@@ -122,3 +122,22 @@ export function getTransactions(cookie: string | undefined, query: Record<string
     headers: cookie ? { cookie } : {},
   })
 }
+
+export function getTransaction(cookie: string | undefined, id: string) {
+  return app.request(`/api/transactions/${id}`, { headers: cookie ? { cookie } : {} })
+}
+
+export function patchTransaction(cookie: string | undefined, id: string, body: unknown) {
+  return app.request(`/api/transactions/${id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', origin: APP_ORIGIN, ...(cookie ? { cookie } : {}) },
+    body: JSON.stringify(body),
+  })
+}
+
+export function deleteTransaction(cookie: string | undefined, id: string) {
+  return app.request(`/api/transactions/${id}`, {
+    method: 'DELETE',
+    headers: { origin: APP_ORIGIN, ...(cookie ? { cookie } : {}) },
+  })
+}

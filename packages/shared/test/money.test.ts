@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { amountInputSchema, formatAmount, MAX_AMOUNT } from '../src/index.js'
+import { amountForInput, amountInputSchema, formatAmount, MAX_AMOUNT } from '../src/index.js'
 
 describe('amountInputSchema', () => {
   it.each([
@@ -89,3 +89,15 @@ function messageFor(currency: 'MYR' | 'JPY', typed: string) {
   const result = amountInputSchema(currency).safeParse(typed)
   return result.success ? undefined : result.error.issues[0]?.message
 }
+
+describe('amountForInput', () => {
+  it.each([
+    [123450, 'MYR', '1234.50'],
+    [1, 'MYR', '0.01'],
+    [100_000_000_000, 'MYR', '1000000000.00'],
+    [1500, 'JPY', '1500'],
+  ] as const)('writes %i in %s as %j, which reads back the same', (minorUnits, currency, typed) => {
+    expect(amountForInput(minorUnits, currency)).toBe(typed)
+    expect(amountInputSchema(currency).parse(typed)).toBe(minorUnits)
+  })
+})

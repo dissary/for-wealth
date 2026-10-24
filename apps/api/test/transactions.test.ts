@@ -5,11 +5,14 @@ import app from '../src/app.js'
 import { db, pool } from '../src/db/client.js'
 import { categories, transactions, users } from '../src/db/schema/index.js'
 import {
+  deleteTransaction,
   getCategories,
   getMe,
+  getTransaction,
   getTransactions,
   NEW_USER,
   OTHER_USER,
+  patchTransaction,
   postTransaction,
   signInNewUser,
   startFresh,
@@ -366,6 +369,218 @@ describe('GET /api/transactions: Category filter', () => {
     const res = await getTransactions(cookie, { period: 'week', date: '2026-03-02' })
 
     expect(await res.json()).toMatchObject({ category: null })
+  })
+})
+
+// Adds a Transaction for the signed-in user and returns its ID.
+async function added(cookie: string, body: Record<string, unknown>) {
+  const res = await postTransaction(cookie, body)
+  expect(res.status).toBe(201)
+  return ((await res.json()) as { id: string }).id
+}
+
+describe('PATCH /api/transactions/:id', () => {
+  it('changes the amount and leaves the rest as it was', async () => {
+    const cookie = await signInNewUser()
+    const food = await categoryId(cookie, 'expense', 'Food')
+    const id = await added(cookie, { categoryId: food, amount: 1250, date: TODAY, note: 'Lunch' })
+
+    const res = await patchTransaction(cookie, id, { amount: 980 })
+
+    expect(res.status).toBe(200)
+    expect(await (await getTransaction(cookie, id)).json()).toEqual({
+      id,
+      amount: 980,
+      date: TODAY,
+      note: 'Lunch',
+      category: { id: food, name: 'Food', kind: 'expense' },
+    })
+  })
+
+  it('changes the date, the Category and the note', async () => {
+    const cookie = await signInNewUser()
+    const food = await categoryId(cookie, 'expense', 'Food')
+    const transport = await categoryId(cookie, 'expense', 'Transport')
+    const id = await added(cookie, { categoryId: food, amount: 1250, date: TODAY, note: 'Lunch' })
+
+    const res = await patchTransaction(cookie, id, { date: '2026-03-02', categoryId: transport, note: ' Grab ' })
+
+    expect(await res.json()).toEqual({
+      id,
+      amount: 1250,
+      date: '2026-03-02',
+      note: 'Grab',
+      category: { id: transport, name: 'Transport', kind: 'expense' },
+    })
+    expect(rows(await list(cookie, { period: 'day', date: TODAY }))).toEqual([])
+    expect(rows(await list(cookie, { period: 'day', date: '2026-03-02' }))).toEqual([
+      ['2026-03-02', 'Transport', 1250],
+    ])
+  })
+
+  it.each([null, '  '])('removes the note when it is %j', async (note) => {
+    const cookie = await signInNewUser()
+    const food = await categoryId(cookie, 'expense', 'Food')
+    const id = await added(cookie, { categoryId: food, amount: 1250, date: TODAY, note: 'Lunch' })
+
+    const res = await patchTransaction(cookie, id, { note })
+
+    expect(await res.json()).toMatchObject({ note: null })
+  })
+
+  it('moves it from the Expense total to the Income total under an Income Category', async () => {
+    const cookie = await signInNewUser()
+    const food = await categoryId(cookie, 'expense', 'Food')
+    const otherIncome = await categoryId(cookie, 'income', 'Other')
+    await added(cookie, { categoryId: food, amount: 450, date: TODAY })
+    const id = await added(cookie, { categoryId: food, amount: 1250, date: TODAY })
+
+    await patchTransaction(cookie, id, { categoryId: otherIncome })
+
+    expect((await list(cookie, { period: 'day', date: TODAY })).totals).toEqual({ income: 1250, expense: 450 })
+  })
+
+  it('refuses what adding refuses, and changes nothing', async () => {
+    const cookie = await signInNewUser()
+    const food = await categoryId(cookie, 'expense', 'Food')
+    const id = await added(cookie, { categoryId: food, amount: 1250, date: TODAY })
+
+    const res = await patchTransaction(cookie, id, {
+      amount: 0,
+      date: dayAfter(addYears(TODAY, 1)),
+      note: 'a'.repeat(201),
+      categoryId: 'food',
+    })
+
+    expect(res.status).toBe(400)
+    const { fields } = (await res.json()) as { fields: Record<string, string[]> }
+    expect(Object.keys(fields).sort()).toEqual(['amount', 'categoryId', 'date', 'note'])
+    expect(await (await getTransaction(cookie, id)).json()).toMatchObject({ amount: 1250, date: TODAY })
+  })
+
+  it('refuses moving to an archived Category, but keeps an archived one it already has', async () => {
+    const cookie = await signInNewUser()
+    const food = await categoryId(cookie, 'expense', 'Food')
+    const transport = await categoryId(cookie, 'expense', 'Transport')
+    const id = await added(cookie, { categoryId: food, amount: 1250, date: TODAY })
+    await db.update(categories).set({ archived: true }).where(eq(categories.id, food))
+    const otherId = await added(cookie, { categoryId: transport, amount: 450, date: TODAY })
+
+    const kept = await patchTransaction(cookie, id, { categoryId: food, amount: 980 })
+    const moved = await patchTransaction(cookie, otherId, { categoryId: food })
+
+    expect(kept.status).toBe(200)
+    expect(await kept.json()).toMatchObject({ amount: 980, category: { id: food } })
+    expect(moved.status).toBe(404)
+    expect(await moved.json()).toMatchObject({ code: 'CATEGORY_NOT_FOUND' })
+  })
+
+  it('gives 404 for moving to another user’s Category, and changes nothing', async () => {
+    const aisyah = await signInNewUser(NEW_USER)
+    const weiMing = await signInNewUser(OTHER_USER)
+    const food = await categoryId(aisyah, 'expense', 'Food')
+    const hisFood = await categoryId(weiMing, 'expense', 'Food')
+    const id = await added(aisyah, { categoryId: food, amount: 1250, date: TODAY })
+
+    const theirs = await patchTransaction(aisyah, id, { categoryId: hisFood, amount: 1 })
+    const missing = await patchTransaction(aisyah, id, { categoryId: '00000000-0000-4000-8000-000000000000' })
+
+    expect(theirs.status).toBe(404)
+    expect(missing.status).toBe(404)
+    expect(await theirs.json()).toEqual(await missing.json())
+    expect(await (await getTransaction(aisyah, id)).json()).toMatchObject({ amount: 1250, category: { id: food } })
+  })
+
+  it('gives user B 404 for user A’s Transaction, the same as for one that doesn’t exist, and A’s is unchanged', async () => {
+    const aisyah = await signInNewUser(NEW_USER)
+    const weiMing = await signInNewUser(OTHER_USER)
+    const food = await categoryId(aisyah, 'expense', 'Food')
+    const hisFood = await categoryId(weiMing, 'expense', 'Food')
+    const id = await added(aisyah, { categoryId: food, amount: 1250, date: TODAY, note: 'Lunch' })
+
+    const theirs = await patchTransaction(weiMing, id, { amount: 1, note: 'Mine now' })
+    const moved = await patchTransaction(weiMing, id, { categoryId: hisFood })
+    const missing = await patchTransaction(weiMing, '00000000-0000-4000-8000-000000000000', { amount: 1 })
+
+    expect([theirs.status, moved.status, missing.status]).toEqual([404, 404, 404])
+    expect(await theirs.json()).toEqual(await missing.json())
+    expect(await (await getTransaction(aisyah, id)).json()).toMatchObject({
+      amount: 1250,
+      note: 'Lunch',
+      category: { id: food },
+    })
+  })
+
+  it('takes whichever save comes last', async () => {
+    const cookie = await signInNewUser()
+    const food = await categoryId(cookie, 'expense', 'Food')
+    const id = await added(cookie, { categoryId: food, amount: 1250, date: TODAY })
+
+    await patchTransaction(cookie, id, { amount: 900 })
+    await patchTransaction(cookie, id, { amount: 1100 })
+
+    expect(await (await getTransaction(cookie, id)).json()).toMatchObject({ amount: 1100 })
+  })
+
+  it('needs a session', async () => {
+    const res = await patchTransaction(undefined, '00000000-0000-4000-8000-000000000000', { amount: 1 })
+
+    expect(res.status).toBe(401)
+  })
+})
+
+describe('GET /api/transactions/:id', () => {
+  it('gives user B 404 for user A’s Transaction, the same as for one that doesn’t exist', async () => {
+    const aisyah = await signInNewUser(NEW_USER)
+    const weiMing = await signInNewUser(OTHER_USER)
+    const food = await categoryId(aisyah, 'expense', 'Food')
+    const id = await added(aisyah, { categoryId: food, amount: 1250, date: TODAY })
+
+    const theirs = await getTransaction(weiMing, id)
+    const missing = await getTransaction(weiMing, '00000000-0000-4000-8000-000000000000')
+    const notAnId = await getTransaction(weiMing, 'not-an-id')
+
+    expect([theirs.status, missing.status, notAnId.status]).toEqual([404, 404, 404])
+    expect(await theirs.json()).toEqual(await missing.json())
+    expect(await notAnId.json()).toEqual({ code: 'TRANSACTION_NOT_FOUND', message: 'That Transaction isn’t available' })
+  })
+})
+
+describe('DELETE /api/transactions/:id', () => {
+  it('removes it for good, from the list and the totals', async () => {
+    const cookie = await signInNewUser()
+    const food = await categoryId(cookie, 'expense', 'Food')
+    await added(cookie, { categoryId: food, amount: 450, date: TODAY })
+    const id = await added(cookie, { categoryId: food, amount: 1250, date: TODAY })
+
+    const res = await deleteTransaction(cookie, id)
+
+    expect(res.status).toBe(204)
+    expect((await getTransaction(cookie, id)).status).toBe(404)
+    const day = await list(cookie, { period: 'day', date: TODAY })
+    expect(day.totals).toEqual({ income: 0, expense: 450 })
+    expect(rows(day)).toEqual([[TODAY, 'Food', 450]])
+    expect((await deleteTransaction(cookie, id)).status).toBe(404)
+  })
+
+  it('gives user B 404 for user A’s Transaction, the same as for one that doesn’t exist, and A’s stays', async () => {
+    const aisyah = await signInNewUser(NEW_USER)
+    const weiMing = await signInNewUser(OTHER_USER)
+    const food = await categoryId(aisyah, 'expense', 'Food')
+    const id = await added(aisyah, { categoryId: food, amount: 1250, date: TODAY })
+
+    const theirs = await deleteTransaction(weiMing, id)
+    const missing = await deleteTransaction(weiMing, '00000000-0000-4000-8000-000000000000')
+
+    expect([theirs.status, missing.status]).toEqual([404, 404])
+    expect(await theirs.json()).toEqual(await missing.json())
+    expect((await getTransaction(aisyah, id)).status).toBe(200)
+  })
+
+  it('needs a session', async () => {
+    const res = await deleteTransaction(undefined, '00000000-0000-4000-8000-000000000000')
+
+    expect(res.status).toBe(401)
   })
 })
 

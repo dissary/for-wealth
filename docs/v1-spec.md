@@ -71,6 +71,7 @@ Decided on 2026-10-22, for slice 2.
 - **Shown as**: Income amounts carry a "+" ("+RM3,000.00"); Expense amounts carry no sign ("RM12.50"). Every row shows its Category's name, and its note when it has one. A Period's Income and Expense totals carry no sign, as their labels say which is which. Red and green stay reserved for Budgets.
 - Dates and money are formatted one way for everyone in v1, English (Malaysia): "Thu, 22 Oct 2026", "RM1,234.50". A setting can come later. Intl's en-MY writes "RM 1,234.50"; the space after a symbol is dropped, but kept (non-breaking) after a three-letter code: "SGD 1,234.50".
 - **Category**: a new Transaction can't be filed under an archived Category. The API answers 404, the same as for another user's Category or one that doesn't exist.
+- As built in slice 2: `GET /api/transactions/:id` reads one Transaction, `PATCH` edits it and `DELETE` removes it (204). `PATCH` takes any of amount, date, `categoryId` and note, under the rules for adding; a field left out stays as it was, and a blank or `null` note removes the note. Moving a Transaction to an archived Category is refused with 404, but keeping the archived Category it already has is allowed, so old Transactions can still be edited. A Transaction that isn't the user's, doesn't exist, or whose ID isn't an ID gets 404 `TRANSACTION_NOT_FOUND`; a Category that can't be used gets 404 `CATEGORY_NOT_FOUND`. The dialog sends every field on save, and lists an archived Category as "Food (archived)" when editing a Transaction under it.
 
 ### The Transactions page
 
