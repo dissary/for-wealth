@@ -6,8 +6,8 @@ import { db, pool } from '../src/db/client.js'
 import { categories, transactions, users } from '../src/db/schema/index.js'
 import {
   getCategories,
-  getDay,
   getMe,
+  getTransactions,
   NEW_USER,
   OTHER_USER,
   postTransaction,
@@ -46,10 +46,11 @@ describe('POST /api/transactions', () => {
     const res = await postTransaction(cookie, { categoryId: food, amount: 1250, date: TODAY, note: ' Lunch ' })
 
     expect(res.status).toBe(201)
-    const day = await (await getDay(cookie, TODAY)).json()
+    const day = await (await getTransactions(cookie, { period: 'day', date: TODAY })).json()
     expect(day).toEqual({
       period: 'day',
       date: TODAY,
+      category: null,
       totals: { income: 0, expense: 1250 },
       transactions: [
         {
@@ -191,7 +192,7 @@ describe('GET /api/transactions?period=day', () => {
     }
     await postTransaction(cookie, { categoryId: food, amount: 999, date: '2026-01-01' })
 
-    const day = (await (await getDay(cookie, TODAY)).json()) as {
+    const day = (await (await getTransactions(cookie, { period: 'day', date: TODAY })).json()) as {
       totals: unknown
       transactions: { amount: number; category: { name: string } }[]
     }
@@ -210,7 +211,7 @@ describe('GET /api/transactions?period=day', () => {
     const food = await categoryId(aisyah, 'expense', 'Food')
     await postTransaction(aisyah, { categoryId: food, amount: 1250, date: TODAY })
 
-    const day = await (await getDay(weiMing, TODAY)).json()
+    const day = await (await getTransactions(weiMing, { period: 'day', date: TODAY })).json()
 
     expect(day).toMatchObject({ totals: { income: 0, expense: 0 }, transactions: [] })
   })
@@ -220,6 +221,9 @@ describe('GET /api/transactions?period=day', () => {
     ['a missing date', 'period=day'],
     ['a date before 2000', 'period=day&date=1999-12-31'],
     ['a date that does not exist', 'period=day&date=2026-02-30'],
+    ['a date more than a year after today', `period=week&date=${dayAfter(addYears(TODAY, 1))}`],
+    ['a range instead of a Period', 'period=week&date=2026-10-22&from=2026-01-01&to=2026-12-31'],
+    ['a Category that is not an ID', 'period=day&date=2026-10-22&category=food'],
   ])('gives 400 for %s', async (_, query) => {
     const cookie = await signInNewUser()
 
@@ -229,9 +233,139 @@ describe('GET /api/transactions?period=day', () => {
   })
 
   it('needs a session', async () => {
-    const res = await getDay(undefined, TODAY)
+    const res = await getTransactions(undefined, { period: 'day', date: TODAY })
 
     expect(res.status).toBe(401)
+  })
+})
+
+type Listing = {
+  totals: { income: number; expense: number }
+  transactions: { amount: number; date: string; category: { name: string } }[]
+}
+
+async function list(cookie: string, query: Record<string, string>) {
+  const res = await getTransactions(cookie, query)
+  expect(res.status).toBe(200)
+  return (await res.json()) as Listing
+}
+
+function rows(listing: Listing) {
+  return listing.transactions.map((t) => [t.date, t.category.name, t.amount])
+}
+
+describe('GET /api/transactions?period=week', () => {
+  // Mon 2 Mar to Sun 8 Mar 2026, with a Transaction just outside each end.
+  it('lists Monday to Sunday, newest date first, with the week’s totals', async () => {
+    const cookie = await signInNewUser()
+    const food = await categoryId(cookie, 'expense', 'Food')
+    const salary = await categoryId(cookie, 'income', 'Salary')
+    for (const [categoryId, amount, date] of [
+      [food, 100, '2026-03-01'],
+      [food, 1250, '2026-03-02'],
+      [salary, 300000, '2026-03-08'],
+      [food, 450, '2026-03-02'],
+      [food, 200, '2026-03-09'],
+    ] as const) {
+      expect((await postTransaction(cookie, { categoryId, amount, date })).status).toBe(201)
+    }
+
+    const week = await list(cookie, { period: 'week', date: '2026-03-04' })
+
+    expect(week.totals).toEqual({ income: 300000, expense: 1700 })
+    expect(rows(week)).toEqual([
+      ['2026-03-08', 'Salary', 300000],
+      ['2026-03-02', 'Food', 450],
+      ['2026-03-02', 'Food', 1250],
+    ])
+  })
+})
+
+describe('GET /api/transactions?period=month', () => {
+  it('lists the calendar month with its totals', async () => {
+    const cookie = await signInNewUser()
+    const food = await categoryId(cookie, 'expense', 'Food')
+    const bonus = await categoryId(cookie, 'income', 'Bonus')
+    for (const [categoryId, amount, date] of [
+      [food, 100, '2026-01-31'],
+      [food, 1250, '2026-02-01'],
+      [bonus, 50000, '2026-02-14'],
+      [food, 450, '2026-02-28'],
+      [food, 200, '2026-03-01'],
+    ] as const) {
+      expect((await postTransaction(cookie, { categoryId, amount, date })).status).toBe(201)
+    }
+
+    const month = await list(cookie, { period: 'month', date: '2026-02-10' })
+
+    expect(month.totals).toEqual({ income: 50000, expense: 1700 })
+    expect(rows(month)).toEqual([
+      ['2026-02-28', 'Food', 450],
+      ['2026-02-14', 'Bonus', 50000],
+      ['2026-02-01', 'Food', 1250],
+    ])
+  })
+})
+
+describe('GET /api/transactions: Category filter', () => {
+  it('narrows the list and the totals to that Category', async () => {
+    const cookie = await signInNewUser()
+    const food = await categoryId(cookie, 'expense', 'Food')
+    const transport = await categoryId(cookie, 'expense', 'Transport')
+    const salary = await categoryId(cookie, 'income', 'Salary')
+    for (const [categoryId, amount, date] of [
+      [food, 1250, '2026-03-02'],
+      [transport, 450, '2026-03-03'],
+      [salary, 300000, '2026-03-04'],
+      [food, 800, '2026-03-05'],
+    ] as const) {
+      expect((await postTransaction(cookie, { categoryId, amount, date })).status).toBe(201)
+    }
+
+    const res = await getTransactions(cookie, { period: 'week', date: '2026-03-04', category: food })
+    const week = (await res.json()) as Listing & { category: unknown }
+
+    expect(week.category).toEqual({ id: food, name: 'Food', kind: 'expense' })
+    expect(week.totals).toEqual({ income: 0, expense: 2050 })
+    expect(rows(week)).toEqual([
+      ['2026-03-05', 'Food', 800],
+      ['2026-03-02', 'Food', 1250],
+    ])
+  })
+
+  // Old Transactions keep an archived Category, so they can still be found.
+  it('works for an archived Category', async () => {
+    const cookie = await signInNewUser()
+    const food = await categoryId(cookie, 'expense', 'Food')
+    await postTransaction(cookie, { categoryId: food, amount: 1250, date: '2026-03-02' })
+    await db.update(categories).set({ archived: true }).where(eq(categories.id, food))
+
+    const week = await list(cookie, { period: 'week', date: '2026-03-02', category: food })
+
+    expect(week.totals).toEqual({ income: 0, expense: 1250 })
+  })
+
+  it('gives 404 for another user’s Category, the same as for one that doesn’t exist', async () => {
+    const aisyah = await signInNewUser(NEW_USER)
+    const weiMing = await signInNewUser(OTHER_USER)
+    const hisFood = await categoryId(weiMing, 'expense', 'Food')
+    await postTransaction(weiMing, { categoryId: hisFood, amount: 1250, date: '2026-03-02' })
+    const query = { period: 'week', date: '2026-03-02' }
+
+    const theirs = await getTransactions(aisyah, { ...query, category: hisFood })
+    const missing = await getTransactions(aisyah, { ...query, category: '00000000-0000-4000-8000-000000000000' })
+
+    expect(theirs.status).toBe(404)
+    expect(missing.status).toBe(404)
+    expect(await theirs.json()).toEqual(await missing.json())
+  })
+
+  it('has no Category without a filter', async () => {
+    const cookie = await signInNewUser()
+
+    const res = await getTransactions(cookie, { period: 'week', date: '2026-03-02' })
+
+    expect(await res.json()).toMatchObject({ category: null })
   })
 })
 

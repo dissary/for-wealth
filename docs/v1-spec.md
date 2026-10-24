@@ -75,11 +75,14 @@ Decided on 2026-10-22, for slice 2.
 ### The Transactions page
 
 - Lives at `/transactions`. Until the dashboard arrives in slice 3, `/` sends signed-in users there, and it opens on today as a Day.
-- At the top: the Period's label ("Thu, 22 Oct 2026", "20–26 Oct 2026", "October 2026"), ‹ › to step back and forward, and a Today button. Below it, the Period's Income total and Expense total. No net figure, so nothing competes with **Remaining**.
+- At the top: the Period's label ("Thu, 22 Oct 2026", "19–25 Oct 2026", "26 Oct – 1 Nov 2026", "October 2026"), ‹ › to step back and forward, and a Today button. Below it, the Period's Income total and Expense total. No net figure, so nothing competes with **Remaining**.
 - Then the Transactions, newest date first, grouped under date headings; within a day, the most recently added first.
 - A Category filter. With a filter on, the totals cover only that Category.
 - The Period, its date and the filter live in the address bar (`/transactions?period=week&date=2026-10-22&category=<id>`), so back, refresh and bookmarks return to the same view. Switching between Day, Week and Month keeps the date. ‹ › stop at the same bounds as a Transaction's date.
 - The API accepts only a Day, a Week or a Month, never an arbitrary range, and returns every Transaction in it without paging.
+- As built in slice 2: `GET /api/transactions` takes `period`, `date` and an optional `category`, and any other parameter gives 400. A `date` outside a Transaction's bounds gives 400. The filter accepts an archived Category, because old Transactions keep it; one that isn't the user's gives 404, the same answer as for adding. The answer names the filtered Category, so the page can show an archived one in the picker. Period boundaries, ‹ › and the labels live in `packages/shared/src/periods.ts`.
+- In the address bar, each invalid value is dropped on its own: an unknown `period` becomes a Day, a bad or out-of-bounds `date` becomes today, and a malformed `category` becomes no filter. With no `date`, the page shows today and moves on at midnight; the Today button removes `date` and keeps the Period and the filter.
+- ‹ › move a Day by a day, a Week by seven days and a Month by a calendar month, keeping the day of the month (31 Jan goes to 28 Feb). A step that would pass a bound lands on the bound, so the Period holding 2000-01-01 or one year after today is shown, and the button stops there.
 - Adding and editing happen in a dialog over the page (a sheet on a phone). An Expense / Income switch, starting on Expense, chooses which Categories the picker shows. Saving closes the dialog and refreshes the list.
 - Every signed-in page has a header: the app name, a Transactions link, and a menu with the user's name holding their email, currency, time zone and Sign out.
 

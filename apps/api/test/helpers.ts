@@ -115,9 +115,10 @@ export function postTransaction(cookie: string | undefined, body: unknown) {
   })
 }
 
-// One day's Transactions and totals.
-export function getDay(cookie: string | undefined, date: string) {
-  return app.request(`/api/transactions?period=day&date=${encodeURIComponent(date)}`, {
+// One Period's Transactions and totals, for a query such as
+// { period: 'week', date: '2026-10-22' }.
+export function getTransactions(cookie: string | undefined, query: Record<string, string>) {
+  return app.request(`/api/transactions?${new URLSearchParams(query)}`, {
     headers: cookie ? { cookie } : {},
   })
 }

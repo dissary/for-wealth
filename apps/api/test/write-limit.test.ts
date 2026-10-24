@@ -2,7 +2,7 @@ import { todayIn } from '@for-wealth/shared'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { pool } from '../src/db/client.js'
 import { writeLimit } from '../src/write-limit.js'
-import { getCategories, getDay, NEW_USER, OTHER_USER, postTransaction, signInNewUser, startFresh } from './helpers.js'
+import { getCategories, getTransactions, NEW_USER, OTHER_USER, postTransaction, signInNewUser, startFresh } from './helpers.js'
 
 const TODAY = todayIn(NEW_USER.timeZone)
 
@@ -41,7 +41,7 @@ describe('the per-user write limit', () => {
     expect(statuses[60]).toBe(429)
     expect(refused.status).toBe(429)
     expect(refused.headers.get('retry-after')).toBe('60')
-    const day = (await (await getDay(cookie, TODAY)).json()) as { transactions: unknown[] }
+    const day = (await (await getTransactions(cookie, { period: 'day', date: TODAY })).json()) as { transactions: unknown[] }
     expect(day.transactions).toHaveLength(60)
   })
 
@@ -78,7 +78,7 @@ describe('the per-user write limit', () => {
     const { cookie, food } = await signInWithFood()
     await writeTimes(60, cookie, food)
 
-    expect((await getDay(cookie, TODAY)).status).toBe(200)
+    expect((await getTransactions(cookie, { period: 'day', date: TODAY })).status).toBe(200)
     expect((await getCategories(cookie)).status).toBe(200)
   })
 })

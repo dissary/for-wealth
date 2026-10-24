@@ -32,6 +32,8 @@ function SignedInLayout() {
               to="/transactions"
               className="rounded-md text-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
               activeProps={{ className: 'font-medium text-foreground', 'aria-current': 'page' }}
+              // Active on any Period or filter of the page, not only the bare path.
+              activeOptions={{ includeSearch: false }}
             >
               Transactions
             </Link>
