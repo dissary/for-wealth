@@ -13,6 +13,26 @@ export function isCalendarDate(value: string): value is CalendarDate {
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
 }
 
+// A calendar month with no zone, as "2026-10". Strings in this form sort in
+// month order, so they compare with < and >.
+export type CalendarMonth = string
+
+const CALENDAR_MONTH = /^\d{4}-(0[1-9]|1[0-2])$/
+
+export function isCalendarMonth(value: string): value is CalendarMonth {
+  return CALENDAR_MONTH.test(value)
+}
+
+// The month holding `date`: "2026-10" for "2026-10-22".
+export function monthOf(date: CalendarDate): CalendarMonth {
+  return date.slice(0, 7)
+}
+
+// "2026-10-01" for "2026-10".
+export function firstDayOf(month: CalendarMonth): CalendarDate {
+  return `${month}-01`
+}
+
 const todayFormatters = new Map<string, Intl.DateTimeFormat>()
 
 // Today's date in the given IANA time zone, which for the user is their own

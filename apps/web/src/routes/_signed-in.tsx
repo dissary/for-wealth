@@ -19,6 +19,10 @@ export const Route = createFileRoute('/_signed-in')({
   component: SignedInLayout,
 })
 
+const NAV_LINK =
+  'rounded-md text-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50'
+const NAV_LINK_ACTIVE = { className: 'font-medium text-foreground', 'aria-current': 'page' } as const
+
 function SignedInLayout() {
   const { me } = Route.useRouteContext()
 
@@ -27,11 +31,20 @@ function SignedInLayout() {
       <header className="flex items-center justify-between gap-4 border-b py-3">
         <div className="flex items-center gap-6">
           <Wordmark />
-          <nav aria-label="Main">
+          <nav aria-label="Main" className="flex items-center gap-4">
+            <Link
+              to="/"
+              className={NAV_LINK}
+              activeProps={NAV_LINK_ACTIVE}
+              // Active on any month of the Dashboard, but not on the pages under it.
+              activeOptions={{ exact: true, includeSearch: false }}
+            >
+              Dashboard
+            </Link>
             <Link
               to="/transactions"
-              className="rounded-md text-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-              activeProps={{ className: 'font-medium text-foreground', 'aria-current': 'page' }}
+              className={NAV_LINK}
+              activeProps={NAV_LINK_ACTIVE}
               // Active on any Period or filter of the page, not only the bare path.
               activeOptions={{ includeSearch: false }}
             >

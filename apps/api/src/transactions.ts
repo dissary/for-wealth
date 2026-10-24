@@ -34,6 +34,13 @@ async function canFileUnder(userId: string, categoryId: string) {
   return !!category
 }
 
+// Joins a Transaction to its Category. Matching on the user as well as the ID
+// keeps every join inside one user's data (ADR 0004).
+export const ownCategory = and(
+  eq(categories.userId, transactions.userId),
+  eq(categories.id, transactions.categoryId),
+)
+
 // A Transaction as the API shows it: with its Category's name and kind,
 // which say whether it is Income or an Expense (ADR 0005). Only the user's
 // own, narrowed further by `conditions`.
@@ -47,10 +54,7 @@ function selectTransactions(userId: string, ...conditions: (SQL | undefined)[]) 
       category: { id: categories.id, name: categories.name, kind: categories.kind },
     })
     .from(transactions)
-    .innerJoin(
-      categories,
-      and(eq(categories.userId, transactions.userId), eq(categories.id, transactions.categoryId)),
-    )
+    .innerJoin(categories, ownCategory)
     .where(and(eq(transactions.userId, userId), ...conditions))
 }
 

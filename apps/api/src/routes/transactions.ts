@@ -8,6 +8,7 @@ import {
 import { type Context, Hono } from 'hono'
 import { validator } from 'hono/validator'
 import { z } from 'zod'
+import { parseFor } from '../parse-for.js'
 import { requireSession, type SignedInEnv } from '../require-session.js'
 import {
   createTransaction,
@@ -27,23 +28,6 @@ function periodQuerySchema(timeZone: string) {
     date: transactionDateSchema(timeZone),
     category: categoryIdSchema.optional(),
   })
-}
-
-// Parses with the schema for this user, or answers 400 saying which fields
-// are wrong and why.
-function parseFor<T extends z.ZodType>(schemaFor: (timeZone: string) => T) {
-  return (value: unknown, c: Context<SignedInEnv>) => {
-    const parsed = schemaFor(c.get('user').timeZone).safeParse(value)
-    if (parsed.success) return parsed.data as z.output<T>
-    return c.json(
-      {
-        code: 'INVALID_INPUT' as const,
-        message: 'Check the highlighted fields',
-        fields: z.flattenError(parsed.error).fieldErrors as Record<string, string[] | undefined>,
-      },
-      400,
-    )
-  }
 }
 
 // Someone else's Category, an archived one to add to or move to, and one
