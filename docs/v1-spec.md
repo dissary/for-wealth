@@ -75,7 +75,7 @@ Decided on 2026-10-22, for slice 2.
 
 ### The Transactions page
 
-- Lives at `/transactions`. Until the dashboard arrives in slice 3, `/` sends signed-in users there, and it opens on today as a Day.
+- Lives at `/transactions`, and opens on today as a Day. (In slice 2, `/` sent signed-in users here; from slice 3, `/` is the Dashboard.)
 - At the top: the Period's label ("Thu, 22 Oct 2026", "19–25 Oct 2026", "26 Oct – 1 Nov 2026", "October 2026"), ‹ › to step back and forward, and a Today button. Below it, the Period's Income total and Expense total. No net figure, so nothing competes with **Remaining**.
 - Then the Transactions, newest date first, grouped under date headings; within a day, the most recently added first.
 - A Category filter. With a filter on, the totals cover only that Category.
@@ -85,7 +85,25 @@ Decided on 2026-10-22, for slice 2.
 - In the address bar, each invalid value is dropped on its own: an unknown `period` becomes a Day, a bad or out-of-bounds `date` becomes today, and a malformed `category` becomes no filter. With no `date`, the page shows today and moves on at midnight; the Today button removes `date` and keeps the Period and the filter.
 - ‹ › move a Day by a day, a Week by seven days and a Month by a calendar month, keeping the day of the month (31 Jan goes to 28 Feb). A step that would pass a bound lands on the bound, so the Period holding 2000-01-01 or one year after today is shown, and the button stops there.
 - Adding and editing happen in a dialog over the page (a sheet on a phone). An Expense / Income switch, starting on Expense, chooses which Categories the picker shows. Saving closes the dialog and refreshes the list.
-- Every signed-in page has a header: the app name, a Transactions link, and a menu with the user's name holding their email, currency, time zone and Sign out.
+- Every signed-in page has a header: the app name, links to the Dashboard and Transactions (from slice 3), and a menu with the user's name holding their email, currency, time zone and Sign out.
+
+### The Dashboard
+
+Decided on 2026-10-24, for slice 3. Slices 4 and 5 add Budgets, Free to Spend, Remaining, Upcoming and Estimates to this page.
+
+- Lives at `/`, so signing in without a `redirect` lands here. The header's links read Dashboard, then Transactions.
+- Shows one month: its Income total, its Expense total, and **Expenses by Category**. Income isn't broken down by Category.
+- No net figure, Free to Spend, Remaining or per-day figure until slice 5. Before Recurring Transactions exist, Remaining would be Income recorded minus Expenses, which is negative every month until the salary is recorded; in slice 5, Expected Income counts recurring Income still due, so the figures arrive together then.
+- **Expenses by Category**: one row per Expense Category with Expenses that month, showing its name, its total and its share of the month's Expenses ("Food RM820.00 · 34%"). Largest total first; equal totals fall back to the Category's position. Categories with no Expenses that month are left out. An archived Category with Expenses that month is listed as "Food (archived)".
+- Shares are whole percentages. A share under 1% shows "<1%", never "0%". Rounded shares may not add up to 100%, and nothing adjusts them.
+- No bars in slice 3. In slice 4, each row gains its Budget limit and a progress bar, so a bar always means Budget progress.
+- A row opens the Transactions page on that Month, filtered to that Category (`/transactions?period=month&date=2026-10-01&category=<id>`). The Income and Expense totals open that Month with no filter.
+- The month lives in the address bar (`/?month=2026-10`). ‹ › step one calendar month, and a "This month" button removes `month`. The bounds are the months holding 2000-01-01 and one year after today. An invalid or out-of-bounds `month` is dropped and the page shows this month. With no `month`, the page shows this month in the user's time zone and moves on at midnight on the 1st.
+- A month's totals count every Transaction dated in it, including ones dated later than today.
+- With no Expenses in the month, the list is replaced by "No Expenses in October 2026." and an Add Transaction button. The totals still show, at RM0.00 where empty.
+- An Add Transaction button opens the same dialog as the Transactions page, with the date starting on today whichever month is shown. Saving refreshes the Dashboard.
+- `GET /api/dashboard?month=YYYY-MM` sums the month in Postgres, scoped to the user, and answers `{ month, totals: { income, expense }, expenseCategories: [{ category: { id, name, archived }, total }] }`, with `expenseCategories` already in display order. `month` is required. Any other parameter, a malformed `month`, or one outside the bounds gives 400, as for `GET /api/transactions`. Slices 4 and 5 add their figures to this answer.
+- Design: build the Dashboard with the `frontend-design` skill and restyle the header to match, within the slice 1 theme and its tests. The page may grow wider than the current 768 px if the Dashboard needs it. Keep top navigation; a sidebar or phone tabs is a slice 6 question. The PR carries light and dark screenshots.
 
 ### Categories
 
@@ -222,6 +240,7 @@ Before inviting friends (slice 7):
 - Vitest tests in `packages/shared` for the money and date logic: Period boundaries, time zones, Free to Spend, Remaining, Budget usage, Recurring due dates (including day 31).
 - API integration tests against a real Postgres, including **"user A cannot read or change user B's data"** for every endpoint that touches user data.
 - Slice 2 tests: a new user has the starter sets, and a user with none gets them on first load; amounts outside the bounds or with too many decimal places are refused; dates outside the bounds (in the user's time zone) are refused; Day, Week and Month totals; a Transaction can't point at another user's Category (the API refuses it, and the database refuses it too); another user's Transaction or Category gives 404 for read, edit, delete and filter; the 61st write in a minute is refused; a request over 16 KB is refused.
+- Slice 3 tests: a month's Income and Expense totals and its Expenses by Category, in order, with Categories that have no Expenses left out; an archived Category with Expenses that month is listed; Transactions dated later this month count; the share rounding, including "<1%"; a malformed, missing or out-of-bounds `month` and any other parameter give 400; another user's Transactions never appear in the totals or the list.
 - API tests use a separate `for_wealth_test` database, run one file at a time (`fileParallelism: false`) and empty the tables between tests. A test signs in by signing up, marking the email verified in the database, then signing in.
 - Slice 1 auth tests: no session gives 401, sign-in before verifying gives 403, a verified sign-in works, currency can't be changed, a breached or short password is rejected, a cross-site POST is rejected, the verification email is sent, a signed-out session's cookie gives 401, a session in use is extended, and two users each see only their own details. Password reset: an unknown email gets the same answer as a known one, a valid link resets the password and the new one signs in while the old one doesn't, a session from before the reset gets 401, a used, expired or earlier link is refused, a weak new password is refused, and a failure while saving the password changes nothing.
 
