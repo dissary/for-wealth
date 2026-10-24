@@ -1,16 +1,19 @@
-import { newTransactionSchema, transactionDateSchema } from '@for-wealth/shared'
+import { categoryIdSchema, newTransactionSchema, periodSchema, transactionDateSchema } from '@for-wealth/shared'
 import { type Context, Hono } from 'hono'
 import { validator } from 'hono/validator'
 import { z } from 'zod'
 import { requireSession, type SignedInEnv } from '../require-session.js'
-import { createTransaction, listDay } from '../transactions.js'
+import { createTransaction, listPeriod } from '../transactions.js'
 import { limitWrites } from '../write-limit.js'
 
-// Today, and so the bounds on a date, are taken in the user's own time zone.
-function dayQuerySchema(timeZone: string) {
-  return z.object({
-    period: z.literal('day', { error: 'Choose a Period' }),
+// A Day, a Week or a Month, named by any date in it, and optionally one
+// Category; nothing else, so no arbitrary ranges. Today, and so the bounds on
+// the date, are taken in the user's own time zone.
+function periodQuerySchema(timeZone: string) {
+  return z.strictObject({
+    period: periodSchema,
     date: transactionDateSchema(timeZone),
+    category: categoryIdSchema.optional(),
   })
 }
 
@@ -31,17 +34,22 @@ function parseFor<T extends z.ZodType>(schemaFor: (timeZone: string) => T) {
   }
 }
 
+// Someone else's Category, an archived one when adding, and one that doesn't
+// exist all get this same answer, so nobody can probe for other users' IDs.
+function categoryNotFound(c: Context) {
+  return c.json({ code: 'CATEGORY_NOT_FOUND' as const, message: 'That Category isn’t available' }, 404)
+}
+
 export const transactions = new Hono<SignedInEnv>()
   .use(requireSession)
   .use(limitWrites)
-  .get('/', validator('query', parseFor(dayQuerySchema)), async (c) => {
-    const { date } = c.req.valid('query')
-    return c.json(await listDay(c.get('user').id, date))
+  .get('/', validator('query', parseFor(periodQuerySchema)), async (c) => {
+    const listing = await listPeriod(c.get('user').id, c.req.valid('query'))
+    if (!listing) return categoryNotFound(c)
+    return c.json(listing)
   })
   .post('/', validator('json', parseFor(newTransactionSchema)), async (c) => {
     const created = await createTransaction(c.get('user').id, c.req.valid('json'))
-    if (!created) {
-      return c.json({ code: 'CATEGORY_NOT_FOUND' as const, message: 'That Category isn’t available' }, 404)
-    }
+    if (!created) return categoryNotFound(c)
     return c.json(created, 201)
   })
