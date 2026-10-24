@@ -1,9 +1,21 @@
-import { categoryIdSchema, newTransactionSchema, periodSchema, transactionDateSchema } from '@for-wealth/shared'
+import {
+  categoryIdSchema,
+  newTransactionSchema,
+  periodSchema,
+  transactionChangesSchema,
+  transactionDateSchema,
+} from '@for-wealth/shared'
 import { type Context, Hono } from 'hono'
 import { validator } from 'hono/validator'
 import { z } from 'zod'
 import { requireSession, type SignedInEnv } from '../require-session.js'
-import { createTransaction, listPeriod } from '../transactions.js'
+import {
+  createTransaction,
+  deleteTransaction,
+  findTransaction,
+  listPeriod,
+  updateTransaction,
+} from '../transactions.js'
 import { limitWrites } from '../write-limit.js'
 
 // A Day, a Week or a Month, named by any date in it, and optionally one
@@ -34,11 +46,25 @@ function parseFor<T extends z.ZodType>(schemaFor: (timeZone: string) => T) {
   }
 }
 
-// Someone else's Category, an archived one when adding, and one that doesn't
-// exist all get this same answer, so nobody can probe for other users' IDs.
+// Someone else's Category, an archived one to add to or move to, and one
+// that doesn't exist all get this same answer, so nobody can probe for other
+// users' IDs.
 function categoryNotFound(c: Context) {
   return c.json({ code: 'CATEGORY_NOT_FOUND' as const, message: 'That Category isn’t available' }, 404)
 }
+
+// Someone else's Transaction and one that doesn't exist get this same answer.
+function transactionNotFound(c: Context) {
+  return c.json({ code: 'TRANSACTION_NOT_FOUND' as const, message: 'That Transaction isn’t available' }, 404)
+}
+
+// A Transaction's ID in the path. One that isn't an ID can't be anyone's, so
+// it gets the same 404 as one that doesn't exist.
+const idParam = validator('param', (value, c) => {
+  const parsed = z.object({ id: z.uuid() }).safeParse(value)
+  if (!parsed.success) return transactionNotFound(c)
+  return parsed.data
+})
 
 export const transactions = new Hono<SignedInEnv>()
   .use(requireSession)
@@ -52,4 +78,19 @@ export const transactions = new Hono<SignedInEnv>()
     const created = await createTransaction(c.get('user').id, c.req.valid('json'))
     if (!created) return categoryNotFound(c)
     return c.json(created, 201)
+  })
+  .get('/:id', idParam, async (c) => {
+    const found = await findTransaction(c.get('user').id, c.req.valid('param').id)
+    if (!found) return transactionNotFound(c)
+    return c.json(found, 200)
+  })
+  .patch('/:id', idParam, validator('json', parseFor(transactionChangesSchema)), async (c) => {
+    const result = await updateTransaction(c.get('user').id, c.req.valid('param').id, c.req.valid('json'))
+    if ('updated' in result) return c.json(result.updated, 200)
+    return result.notFound === 'category' ? categoryNotFound(c) : transactionNotFound(c)
+  })
+  .delete('/:id', idParam, async (c) => {
+    const deleted = await deleteTransaction(c.get('user').id, c.req.valid('param').id)
+    if (!deleted) return transactionNotFound(c)
+    return c.body(null, 204)
   })

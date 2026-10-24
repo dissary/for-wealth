@@ -2,7 +2,18 @@ import { todayIn } from '@for-wealth/shared'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { pool } from '../src/db/client.js'
 import { writeLimit } from '../src/write-limit.js'
-import { getCategories, getTransactions, NEW_USER, OTHER_USER, postTransaction, signInNewUser, startFresh } from './helpers.js'
+import {
+  deleteTransaction,
+  getCategories,
+  getTransaction,
+  getTransactions,
+  NEW_USER,
+  OTHER_USER,
+  patchTransaction,
+  postTransaction,
+  signInNewUser,
+  startFresh,
+} from './helpers.js'
 
 const TODAY = todayIn(NEW_USER.timeZone)
 
@@ -80,5 +91,19 @@ describe('the per-user write limit', () => {
 
     expect((await getTransactions(cookie, { period: 'day', date: TODAY })).status).toBe(200)
     expect((await getCategories(cookie)).status).toBe(200)
+  })
+
+  it('counts edits and deletes, and refuses them over the limit', async () => {
+    const { cookie, food } = await signInWithFood()
+    const added = await postTransaction(cookie, { categoryId: food, amount: 100, date: TODAY })
+    const { id } = (await added.json()) as { id: string }
+    for (let i = 0; i < 29; i++) expect((await patchTransaction(cookie, id, { amount: 200 + i })).status).toBe(200)
+    for (let i = 0; i < 30; i++) await deleteTransaction(cookie, '00000000-0000-4000-8000-000000000000')
+
+    const edited = await patchTransaction(cookie, id, { amount: 999 })
+    const deleted = await deleteTransaction(cookie, id)
+
+    expect([edited.status, deleted.status]).toEqual([429, 429])
+    expect(await (await getTransaction(cookie, id)).json()).toMatchObject({ amount: 228 })
   })
 })

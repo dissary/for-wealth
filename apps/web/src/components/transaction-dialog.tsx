@@ -1,4 +1,5 @@
 import {
+  amountForInput,
   amountInputSchema,
   type CalendarDate,
   CATEGORY_KINDS,
@@ -13,7 +14,7 @@ import {
 } from '@for-wealth/shared'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
@@ -29,7 +30,7 @@ import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { api } from '@/lib/api'
 import { categoriesQuery } from '@/lib/categories'
-import { TRANSACTIONS_KEY } from '@/lib/transactions'
+import { type Transaction, TRANSACTIONS_KEY } from '@/lib/transactions'
 
 // In the switch's order: Expense first, as most Transactions are one.
 const KIND_LABELS: Record<CategoryKind, string> = { expense: 'Expense', income: 'Income' }
@@ -55,24 +56,29 @@ interface Props {
   onOpenChange: (open: boolean) => void
   currency: CurrencyCode
   timeZone: string
-  // Where the date field starts: the day being viewed.
+  // Where the date field starts when adding: the day being viewed.
   defaultDate: CalendarDate
+  // The Transaction to edit, filled in; without one, a new one is added.
+  transaction?: Transaction | undefined
 }
 
-// Adds an Income or Expense Transaction: a dialog over the page, a sheet on
-// a phone. Saving closes it and refreshes the list.
-export function AddTransactionDialog({ open, onOpenChange, ...formProps }: Props) {
+// Adds an Income or Expense Transaction, or edits or deletes one: a dialog
+// over the page, a sheet on a phone. Saving or deleting closes it and
+// refreshes the list.
+export function TransactionDialog({ open, onOpenChange, transaction, ...formProps }: Props) {
+  const close = () => onOpenChange(false)
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Transaction</DialogTitle>
+          <DialogTitle>{transaction ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle>
           <DialogDescription className="sr-only">
-            Record money coming in or going out.
+            {transaction ? 'Change or delete this Transaction.' : 'Record money coming in or going out.'}
           </DialogDescription>
         </DialogHeader>
         {/* Inside the content, so each opening starts with a fresh form. */}
-        <AddTransactionForm {...formProps} onSaved={() => onOpenChange(false)} />
+        <TransactionForm {...formProps} transaction={transaction} onDone={close} />
+        {transaction && <DeleteTransaction id={transaction.id} onDeleted={close} />}
       </DialogContent>
     </Dialog>
   )
@@ -80,35 +86,53 @@ export function AddTransactionDialog({ open, onOpenChange, ...formProps }: Props
 
 const FIELDS = ['categoryId', 'amount', 'date', 'note'] as const
 
-function AddTransactionForm({
+function TransactionForm({
   currency,
   timeZone,
   defaultDate,
-  onSaved,
-}: Omit<Props, 'open' | 'onOpenChange'> & { onSaved: () => void }) {
+  transaction,
+  onDone,
+}: Omit<Props, 'open' | 'onOpenChange'> & { onDone: () => void }) {
   const queryClient = useQueryClient()
   const categories = useQuery(categoriesQuery)
   const schema = useMemo(() => formSchema(currency, timeZone), [currency, timeZone])
   const form = useForm<FormInput, unknown, FormOutput>({
     resolver: zodResolver(schema),
-    defaultValues: { kind: 'expense', categoryId: '', amount: '', date: defaultDate, note: '' },
+    defaultValues: transaction
+      ? {
+          kind: transaction.category.kind,
+          categoryId: transaction.category.id,
+          amount: amountForInput(transaction.amount, currency),
+          date: transaction.date,
+          note: transaction.note ?? '',
+        }
+      : { kind: 'expense', categoryId: '', amount: '', date: defaultDate, note: '' },
   })
   const { errors, isSubmitting } = form.formState
   const kind = useWatch({ control: form.control, name: 'kind' })
 
   async function onSubmit({ categoryId, amount, date, note }: FormOutput) {
+    const json = { categoryId, amount, date, note }
     let res
     try {
-      res = await api.transactions.$post({ json: { categoryId, amount, date, note } })
+      // Every field is sent; whichever save comes last wins.
+      res = transaction
+        ? await api.transactions[':id'].$patch({ param: { id: transaction.id }, json })
+        : await api.transactions.$post({ json })
     } catch {
       return form.setError('root', { message: "Couldn't reach For Wealth. Check your connection and save again." })
     }
 
     if (res.ok) {
       void queryClient.invalidateQueries({ queryKey: TRANSACTIONS_KEY })
-      return onSaved()
+      return onDone()
     }
     if (res.status === 404) {
+      const { code } = await res.json()
+      if (code === 'TRANSACTION_NOT_FOUND') {
+        void queryClient.invalidateQueries({ queryKey: TRANSACTIONS_KEY })
+        return form.setError('root', { message: 'This Transaction no longer exists. Close this to see the list.' })
+      }
       void queryClient.invalidateQueries({ queryKey: categoriesQuery.queryKey })
       return form.setError(
         'categoryId',
@@ -122,16 +146,20 @@ function AddTransactionForm({
       for (const field of wrong) form.setError(field, { message: fields[field]![0] })
       if (wrong.length > 0) return form.setFocus(wrong[0]!)
     }
-    // From the write limit, a middleware, so the RPC types don't list it.
-    if ((res.status as number) === 429) {
-      return form.setError('root', {
-        message: 'That’s a lot of changes in one minute. Wait a moment, then save again.',
-      })
+    if (isTooManyWrites(res)) {
+      return form.setError('root', { message: TOO_MANY_WRITES })
     }
     form.setError('root', { message: "The Transaction wasn't saved. Try again." })
   }
 
-  const options = categories.data?.[kind] ?? []
+  // A Transaction keeps an archived Category, which the picker doesn't list,
+  // so it is added while editing one of its kind.
+  const listed = categories.data?.[kind] ?? []
+  const archived =
+    transaction && transaction.category.kind === kind && !listed.some((c) => c.id === transaction.category.id)
+      ? [{ id: transaction.category.id, name: `${transaction.category.name} (archived)` }]
+      : []
+  const options = [...archived, ...listed]
   const keypad = decimalPlacesOf(currency) === 0 ? 'numeric' : 'decimal'
 
   return (
@@ -231,4 +259,67 @@ function AddTransactionForm({
       </FieldGroup>
     </form>
   )
+}
+
+// Deleting is for good, so it asks first. The warning is in the words, not
+// in red: `destructive` is ink, as red is kept for Budgets (v1-spec "Design").
+function DeleteTransaction({ id, onDeleted }: { id: string; onDeleted: () => void }) {
+  const queryClient = useQueryClient()
+  const [confirming, setConfirming] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState<string>()
+
+  async function onDelete() {
+    setDeleting(true)
+    setError(undefined)
+    let res
+    try {
+      res = await api.transactions[':id'].$delete({ param: { id } })
+    } catch {
+      setDeleting(false)
+      return setError("Couldn't reach For Wealth. Check your connection and delete again.")
+    }
+    setDeleting(false)
+
+    // Already gone counts as deleted.
+    if (res.ok || res.status === 404) {
+      void queryClient.invalidateQueries({ queryKey: TRANSACTIONS_KEY })
+      return onDeleted()
+    }
+    setError(isTooManyWrites(res) ? TOO_MANY_WRITES : "The Transaction wasn't deleted. Try again.")
+  }
+
+  if (!confirming) {
+    return (
+      <div className="border-t pt-4">
+        <Button variant="ghost" onClick={() => setConfirming(true)}>
+          Delete
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div role="group" aria-labelledby="delete-question" className="flex flex-col gap-3 border-t pt-4">
+      <p id="delete-question" className="text-sm">
+        Delete this Transaction for good? This can't be undone.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="destructive" disabled={deleting} onClick={onDelete} autoFocus>
+          {deleting ? 'Deleting…' : 'Delete Transaction'}
+        </Button>
+        <Button variant="outline" disabled={deleting} onClick={() => setConfirming(false)}>
+          Keep it
+        </Button>
+      </div>
+      <FieldError>{error}</FieldError>
+    </div>
+  )
+}
+
+const TOO_MANY_WRITES = 'That’s a lot of changes in one minute. Wait a moment, then try again.'
+
+// From the write limit, a middleware, so the RPC types don't list it.
+function isTooManyWrites(res: Response) {
+  return res.status === 429
 }

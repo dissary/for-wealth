@@ -94,6 +94,13 @@ export function formatAmount(minorUnits: number, currency: CurrencyCode, kind?: 
     .join('')
 }
 
+// An amount in minor units as it starts in an amount field for editing:
+// "1234.50" for 123450 sen, with no symbol or separators, which
+// amountInputSchema reads back as the same amount.
+export function amountForInput(minorUnits: number, currency: CurrencyCode): string {
+  return toDecimalString(minorUnits, decimalPlacesOf(currency))
+}
+
 // 123450 with 2 decimal places is "1234.50".
 function toDecimalString(minorUnits: number, decimalPlaces: number): `${number}` {
   if (!Number.isSafeInteger(minorUnits)) throw new Error(`Not a whole number of minor units: ${minorUnits}`)

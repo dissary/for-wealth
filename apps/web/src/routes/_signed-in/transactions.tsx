@@ -18,11 +18,11 @@ import { createFileRoute, Link, redirect } from '@tanstack/react-router'
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { z } from 'zod'
-import { AddTransactionDialog } from '@/components/add-transaction-dialog'
+import { TransactionDialog } from '@/components/transaction-dialog'
 import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOptGroup, NativeSelectOption } from '@/components/ui/native-select'
 import { categoriesQuery } from '@/lib/categories'
-import { type Listing, periodQuery } from '@/lib/transactions'
+import { type Listing, periodQuery, type Transaction } from '@/lib/transactions'
 
 // The whole view lives in the address bar, so back, refresh and a bookmark
 // return to it: /transactions?period=week&date=2026-10-22&category=<id>.
@@ -55,7 +55,10 @@ function TransactionsPage() {
   const period = search.period ?? 'day'
   const date = search.date ?? today
   const listing = useQuery(periodQuery({ period, date, category: search.category }))
-  const [adding, setAdding] = useState(false)
+  // Adding when there's no Transaction, else editing it. Closing keeps the
+  // Transaction, so the dialog doesn't turn into "Add" while it fades out.
+  const [dialog, setDialog] = useState<{ open: boolean; transaction?: Transaction }>({ open: false })
+  const add = () => setDialog({ open: true })
 
   const bounds = { earliest: EARLIEST_DATE, latest: addYears(today, 1) }
 
@@ -65,7 +68,7 @@ function TransactionsPage() {
         <h1 className="font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
           {formatPeriodLabel(period, date)}
         </h1>
-        <Button size="lg" onClick={() => setAdding(true)}>
+        <Button size="lg" onClick={add}>
           <PlusIcon aria-hidden="true" />
           Add Transaction
         </Button>
@@ -118,13 +121,15 @@ function TransactionsPage() {
           listing={listing.data}
           currency={me.currency}
           stale={listing.isPlaceholderData}
-          onAdd={() => setAdding(true)}
+          onAdd={add}
+          onEdit={(transaction) => setDialog({ open: true, transaction })}
         />
       )}
 
-      <AddTransactionDialog
-        open={adding}
-        onOpenChange={setAdding}
+      <TransactionDialog
+        open={dialog.open}
+        onOpenChange={(open) => setDialog((current) => ({ ...current, open }))}
+        transaction={dialog.transaction}
         currency={me.currency}
         timeZone={me.timeZone}
         // A single Day starts the date field on that day; otherwise today
@@ -242,12 +247,14 @@ function PeriodView({
   currency,
   stale,
   onAdd,
+  onEdit,
 }: {
   listing: Listing
   currency: CurrencyCode
   // Still the previous Period's, while the new one loads.
   stale: boolean
   onAdd: () => void
+  onEdit: (transaction: Transaction) => void
 }) {
   const where = listing.category ? ` under ${listing.category.name}` : ''
 
@@ -272,7 +279,7 @@ function PeriodView({
         </div>
       ) : listing.period === 'day' ? (
         // The heading already names the day.
-        <TransactionList transactions={listing.transactions} currency={currency} />
+        <TransactionList transactions={listing.transactions} currency={currency} onEdit={onEdit} />
       ) : (
         <div className="flex flex-col gap-6">
           {byDate(listing.transactions).map(([date, transactions]) => (
@@ -280,7 +287,7 @@ function PeriodView({
               <h2 id={`day-${date}`} className="pb-2 text-sm font-medium text-muted-foreground">
                 {formatDayLabel(date)}
               </h2>
-              <TransactionList transactions={transactions} currency={currency} />
+              <TransactionList transactions={transactions} currency={currency} onEdit={onEdit} />
             </section>
           ))}
         </div>
@@ -288,8 +295,6 @@ function PeriodView({
     </div>
   )
 }
-
-type Transaction = Listing['transactions'][number]
 
 // The API sends them newest date first, so each date's run is contiguous.
 function byDate(transactions: Transaction[]): [CalendarDate, Transaction[]][] {
@@ -302,19 +307,37 @@ function byDate(transactions: Transaction[]): [CalendarDate, Transaction[]][] {
   return groups
 }
 
-function TransactionList({ transactions, currency }: { transactions: Transaction[]; currency: CurrencyCode }) {
+// Each row opens the Transaction in the dialog, to edit or delete it.
+function TransactionList({
+  transactions,
+  currency,
+  onEdit,
+}: {
+  transactions: Transaction[]
+  currency: CurrencyCode
+  onEdit: (transaction: Transaction) => void
+}) {
   return (
     <ul aria-label="Transactions" className="divide-y border-t">
       {transactions.map((transaction) => (
-        <li key={transaction.id} className="flex items-baseline justify-between gap-4 py-3">
-          <div className="min-w-0">
-            <p className="font-medium">{transaction.category.name}</p>
-            {transaction.note && <p className="truncate text-sm text-muted-foreground">{transaction.note}</p>}
-          </div>
-          {/* "+" for Income, no sign for Expenses, and no red or green. */}
-          <p className="shrink-0 tabular-nums">
-            {formatAmount(transaction.amount, currency, transaction.category.kind)}
-          </p>
+        <li key={transaction.id}>
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            onClick={() => onEdit(transaction)}
+            className="-mx-2 flex w-[calc(100%+1rem)] items-baseline justify-between gap-4 rounded-md px-2 py-3 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <span className="min-w-0">
+              <span className="block font-medium">{transaction.category.name}</span>
+              {transaction.note && (
+                <span className="block truncate text-sm text-muted-foreground">{transaction.note}</span>
+              )}
+            </span>
+            {/* "+" for Income, no sign for Expenses, and no red or green. */}
+            <span className="shrink-0 tabular-nums">
+              {formatAmount(transaction.amount, currency, transaction.category.kind)}
+            </span>
+          </button>
         </li>
       ))}
     </ul>

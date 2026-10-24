@@ -53,3 +53,12 @@ export function newTransactionSchema(timeZone: string, now: Date = new Date()) {
 
 export type NewTransactionInput = z.input<ReturnType<typeof newTransactionSchema>>
 export type NewTransaction = z.output<ReturnType<typeof newTransactionSchema>>
+
+// What the API takes to edit a Transaction: any of its fields, under the same
+// rules as adding. A field left out stays as it was; a blank or null note
+// removes the note.
+export function transactionChangesSchema(timeZone: string, now: Date = new Date()) {
+  return newTransactionSchema(timeZone, now).partial()
+}
+
+export type TransactionChanges = z.output<ReturnType<typeof transactionChangesSchema>>
