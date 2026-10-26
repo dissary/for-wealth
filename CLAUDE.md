@@ -16,8 +16,8 @@ Personal app for tracking and planning income and spending. pnpm monorepo: `apps
 
 ## Environment
 
-- Containers run on Podman (`podman compose`); this machine has no Docker.
-- Local only until slice 7 of the spec. In dev, emails print to the API console.
+- The dev database is hosted on Neon and shared by every machine ([ADR 0006](docs/adr/0006-dev-database-on-neon.md)); nothing runs in a container. Only run `pnpm db:migrate` from `main` or a branch about to merge.
+- The app runs locally until slice 7 of the spec. In dev, emails print to the API console.
 
 ## Agent skills
 

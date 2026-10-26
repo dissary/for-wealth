@@ -168,7 +168,7 @@ for-wealth/
 | Charts | Recharts |
 | Dates | date-fns |
 | Tests | Vitest |
-| Local database | Postgres in a container (Podman on this machine) |
+| Dev database | Postgres on Neon, in a dev project separate from production ([ADR 0006](adr/0006-dev-database-on-neon.md)) |
 
 ### Setup decisions
 
@@ -198,9 +198,9 @@ Settled on 2026-10-20 from [the slice 1 research](research/better-auth-hono-driz
 
 ### Running locally (until launch)
 
-Everything runs on the author's machine until it's ready for friends. No domain or hosting account is needed before then.
+The app runs on the author's machines until it's ready for friends. No domain or app hosting is needed before then.
 
-- Postgres runs in a Podman container.
+- The database is a Neon dev project, shared by every machine. It holds a `for_wealth` database for development, plus `for_wealth_test` on a machine that runs the tests locally (CI always runs them on its own Postgres). Which database production uses is decided at launch.
 - `pnpm dev` runs the web app and the API side by side. Vite proxies `/api/*` to the API, so the browser sees one address, just like production.
 - Emails (verification, password reset) are printed to the API console instead of being sent. Resend is wired in only for production.
 - Google sign-in is added in slice 6 and works locally with a `localhost` redirect URL. Slice 1 is email and password only.
@@ -241,7 +241,7 @@ Before inviting friends (slice 7):
 - API integration tests against a real Postgres, including **"user A cannot read or change user B's data"** for every endpoint that touches user data.
 - Slice 2 tests: a new user has the starter sets, and a user with none gets them on first load; amounts outside the bounds or with too many decimal places are refused; dates outside the bounds (in the user's time zone) are refused; Day, Week and Month totals; a Transaction can't point at another user's Category (the API refuses it, and the database refuses it too); another user's Transaction or Category gives 404 for read, edit, delete and filter; the 61st write in a minute is refused; a request over 16 KB is refused.
 - Slice 3 tests: a month's Income and Expense totals and its Expenses by Category, in order, with Categories that have no Expenses left out; an archived Category with Expenses that month is listed; Transactions dated later this month count; the share rounding, including "<1%"; a malformed, missing or out-of-bounds `month` and any other parameter give 400; another user's Transactions never appear in the totals or the list.
-- API tests use a separate `for_wealth_test` database, run one file at a time (`fileParallelism: false`) and empty the tables between tests. A test signs in by signing up, marking the email verified in the database, then signing in.
+- API tests use a separate `for_wealth_test` database (`TEST_DATABASE_URL`), run one file at a time (`fileParallelism: false`) and empty the tables between tests. A test signs in by signing up, marking the email verified in the database, then signing in.
 - Slice 1 auth tests: no session gives 401, sign-in before verifying gives 403, a verified sign-in works, currency can't be changed, a breached or short password is rejected, a cross-site POST is rejected, the verification email is sent, a signed-out session's cookie gives 401, a session in use is extended, and two users each see only their own details. Password reset: an unknown email gets the same answer as a known one, a valid link resets the password and the new one signs in while the old one doesn't, a session from before the reset gets 401, a used, expired or earlier link is refused, a weak new password is refused, and a failure while saving the password changes nothing.
 
 ## Build order
