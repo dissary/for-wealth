@@ -3,9 +3,12 @@ import {
   addDays,
   addMonths,
   type CalendarDate,
+  type CalendarMonth,
   daysInMonth,
+  firstDayOf,
   formatDayLabel,
   isoWeekday,
+  monthOf,
   toCalendarDate,
   utcMidnight,
 } from './dates.js'
@@ -52,6 +55,18 @@ export function stepPeriod(
   if (stepped < bounds.earliest) return bounds.earliest
   if (stepped > bounds.latest) return bounds.latest
   return stepped
+}
+
+// The month the Dashboard shows after ‹ (-1) or › (1): the Month Period
+// stepped from its first day, so it stops at the months holding the bounds
+// (v1-spec "The Dashboard").
+export function stepMonth(
+  month: CalendarMonth,
+  direction: -1 | 1,
+  bounds: { earliest: CalendarDate; latest: CalendarDate },
+): CalendarMonth | null {
+  const stepped = stepPeriod('month', firstDayOf(month), direction, bounds)
+  return stepped && monthOf(stepped)
 }
 
 // Read and formatted in UTC, like formatDayLabel, so the device's zone can't
