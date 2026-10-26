@@ -14,12 +14,15 @@ import {
 } from '@for-wealth/shared'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link, redirect } from '@tanstack/react-router'
-import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
+import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from 'lucide-react'
+import { useState } from 'react'
 import { z } from 'zod'
 import { Total } from '@/components/total'
+import { TransactionDialog } from '@/components/transaction-dialog'
 import { Button } from '@/components/ui/button'
 import { useToday } from '@/hooks/use-today'
 import { type Dashboard, dashboardQuery } from '@/lib/dashboard'
+import type { View } from '@/lib/transactions'
 
 // The month lives in the address bar, so back, refresh and a bookmark return
 // to it: /?month=2026-10. One that isn't valid is dropped, and the router takes
@@ -51,10 +54,18 @@ function DashboardPage() {
   const dashboard = useQuery(dashboardQuery(month))
   const label = formatPeriodLabel('month', firstDayOf(month))
   const bounds = { earliest: EARLIEST_DATE, latest: addYears(today, 1) }
+  const [adding, setAdding] = useState(false)
+  const add = () => setAdding(true)
 
   return (
     <main className="flex flex-col gap-6 py-8 sm:py-12">
-      <h1 className="font-heading text-4xl font-semibold tracking-tight sm:text-5xl">{label}</h1>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <h1 className="font-heading text-4xl font-semibold tracking-tight sm:text-5xl">{label}</h1>
+        <Button size="lg" onClick={add}>
+          <PlusIcon aria-hidden="true" />
+          Add Transaction
+        </Button>
+      </div>
 
       <nav aria-label="Months" className="flex items-center gap-1">
         <StepLink to={stepMonth(month, -1, bounds)} direction={-1} />
@@ -82,8 +93,24 @@ function DashboardPage() {
         </div>
       )}
       {dashboard.data && (
-        <MonthView dashboard={dashboard.data} currency={me.currency} stale={dashboard.isPlaceholderData} />
+        <MonthView
+          dashboard={dashboard.data}
+          currency={me.currency}
+          stale={dashboard.isPlaceholderData}
+          onAdd={add}
+        />
       )}
+
+      {/* Saving refreshes the Dashboard, as its totals are summed from the
+          Transactions (lib/dashboard). */}
+      <TransactionDialog
+        open={adding}
+        onOpenChange={setAdding}
+        currency={me.currency}
+        timeZone={me.timeZone}
+        // Today, whichever month is shown (v1-spec "The Dashboard").
+        defaultDate={today}
+      />
     </main>
   )
 }
@@ -113,15 +140,22 @@ function MonthView({
   dashboard,
   currency,
   stale,
+  onAdd,
 }: {
   dashboard: Dashboard
   currency: CurrencyCode
   // Still the previous month's, while the new one loads.
   stale: boolean
+  onAdd: () => void
 }) {
   const { totals, expenseCategories } = dashboard
-  // From the data, not the heading, so a stale month still names its own.
-  const label = formatPeriodLabel('month', firstDayOf(dashboard.month))
+  // From the data, not the heading, so a stale month still names and links
+  // to its own.
+  const firstDay = firstDayOf(dashboard.month)
+  const label = formatPeriodLabel('month', firstDay)
+  // Each figure opens the Transactions behind it: this Month, filtered to a
+  // row's Category, archived or not (the filter accepts both).
+  const monthView: View = { period: 'month', date: firstDay }
 
   return (
     <div aria-busy={stale} className="flex flex-col gap-6 transition-opacity aria-busy:opacity-60">
@@ -129,8 +163,8 @@ function MonthView({
           "The Dashboard"). The labels say which is which, so neither total
           has a sign. */}
       <dl className="flex gap-10">
-        <Total label="Income" amount={formatAmount(totals.income, currency)} />
-        <Total label="Expenses" amount={formatAmount(totals.expense, currency)} />
+        <Total label="Income" amount={formatAmount(totals.income, currency)} view={monthView} />
+        <Total label="Expenses" amount={formatAmount(totals.expense, currency)} view={monthView} />
       </dl>
 
       <section aria-labelledby="expenses-by-category" className="flex flex-col gap-2">
@@ -138,22 +172,33 @@ function MonthView({
           Expenses by Category
         </h2>
         {expenseCategories.length === 0 ? (
-          <p className="border-t pt-6 text-muted-foreground">No Expenses in {label}.</p>
+          <div className="flex flex-col items-start gap-3 border-t pt-6">
+            <p className="text-muted-foreground">No Expenses in {label}.</p>
+            <Button variant="outline" onClick={onAdd}>
+              Add a Transaction
+            </Button>
+          </div>
         ) : (
           // Already in display order: largest total first. No bars until
           // slice 4, where a bar always means Budget progress.
           <ul aria-labelledby="expenses-by-category" className="divide-y border-t">
             {expenseCategories.map(({ category, total }) => (
-              <li key={category.id} className="flex items-baseline justify-between gap-4 py-3">
-                <span className="min-w-0 font-medium">
-                  {category.archived ? `${category.name} (archived)` : category.name}
-                </span>
-                <span className="flex shrink-0 items-baseline gap-3 tabular-nums">
-                  <span>{formatAmount(total, currency)}</span>
-                  <span className="w-10 text-right text-sm text-muted-foreground">
-                    {formatShare(total, totals.expense)}
+              <li key={category.id}>
+                <Link
+                  to="/transactions"
+                  search={{ ...monthView, category: category.id }}
+                  className="-mx-2 flex w-[calc(100%+1rem)] items-baseline justify-between gap-4 rounded-md px-2 py-3 transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  <span className="min-w-0 font-medium">
+                    {category.archived ? `${category.name} (archived)` : category.name}
                   </span>
-                </span>
+                  <span className="flex shrink-0 items-baseline gap-3 tabular-nums">
+                    <span>{formatAmount(total, currency)}</span>
+                    <span className="w-10 text-right text-sm text-muted-foreground">
+                      {formatShare(total, totals.expense)}
+                    </span>
+                  </span>
+                </Link>
               </li>
             ))}
           </ul>
