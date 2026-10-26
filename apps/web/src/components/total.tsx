@@ -6,8 +6,20 @@ import { cn } from '@/lib/utils'
 // A Period's or month's Income or Expense total, in a <dl>. The label says
 // which is which, so the amount carries no sign. Given a view, the total opens
 // those Transactions: the amount is the link, named "Income RM3,000.00", and
-// the whole figure, label too, can be clicked.
-export function Total({ label, amount, view }: { label: string; amount: string; view?: View }) {
+// the whole figure, label too, can be clicked. Large, it's set in the narrow
+// heading cut, smaller on a phone so a six-figure total fits its half-width
+// column; one longer still wraps rather than scrolling the page.
+export function Total({
+  label,
+  amount,
+  view,
+  size = 'default',
+}: {
+  label: string
+  amount: string
+  view?: View
+  size?: 'default' | 'large'
+}) {
   const id = useId()
   return (
     <div
@@ -20,7 +32,12 @@ export function Total({ label, amount, view }: { label: string; amount: string; 
       <dt id={`${id}-label`} className="text-sm text-muted-foreground">
         {label}
       </dt>
-      <dd className="text-xl font-medium tabular-nums">
+      <dd
+        className={cn(
+          'text-xl font-medium tabular-nums',
+          size === 'large' && 'font-heading text-2xl font-semibold tracking-tight wrap-anywhere sm:text-3xl lg:text-4xl',
+        )}
+      >
         {view ? (
           <Link
             id={`${id}-amount`}

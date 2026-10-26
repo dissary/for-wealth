@@ -19,23 +19,25 @@ export const Route = createFileRoute('/_signed-in')({
   component: SignedInLayout,
 })
 
+// Links along the header's bottom edge. The router marks the current page's
+// link aria-current, and it is underlined in the accent on the header's rule.
 const NAV_LINK =
-  'rounded-md text-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50'
-const NAV_LINK_ACTIVE = { className: 'font-medium text-foreground', 'aria-current': 'page' } as const
+  'relative flex h-10 items-center rounded-md px-1 text-sm text-muted-foreground transition-colors outline-none after:absolute after:inset-x-1 after:-bottom-px after:h-0.5 after:rounded-full hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 aria-[current=page]:font-medium aria-[current=page]:text-foreground aria-[current=page]:after:bg-primary sm:h-14'
 
 function SignedInLayout() {
   const { me } = Route.useRouteContext()
 
   return (
-    <div className="mx-auto flex min-h-svh w-full max-w-3xl flex-col px-4 sm:px-6">
-      <header className="flex items-center justify-between gap-4 border-b py-3">
-        <div className="flex items-center gap-6">
-          <Wordmark />
-          <nav aria-label="Main" className="flex items-center gap-4">
+    <div className="flex min-h-svh flex-col">
+      <header className="border-b bg-card">
+        {/* One row from sm up. On a phone the links take a second row, so the
+            app name, both links and the user's name all fit. */}
+        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-x-8 px-4 sm:flex-nowrap sm:px-6">
+          <Wordmark className="flex h-12 items-center font-heading text-lg font-semibold tracking-tight sm:h-14" />
+          <nav aria-label="Main" className="order-last flex w-full items-center gap-5 sm:order-none sm:w-auto sm:flex-1">
             <Link
               to="/"
               className={NAV_LINK}
-              activeProps={NAV_LINK_ACTIVE}
               // Active on any month of the Dashboard, but not on the pages under it.
               activeOptions={{ exact: true, includeSearch: false }}
             >
@@ -44,17 +46,20 @@ function SignedInLayout() {
             <Link
               to="/transactions"
               className={NAV_LINK}
-              activeProps={NAV_LINK_ACTIVE}
               // Active on any Period or filter of the page, not only the bare path.
               activeOptions={{ includeSearch: false }}
             >
               Transactions
             </Link>
           </nav>
+          <UserMenu me={me} />
         </div>
-        <UserMenu me={me} />
       </header>
-      <Outlet />
+      {/* Wider than a reading column, so the Dashboard can set its totals
+          beside Expenses by Category. */}
+      <div className="mx-auto w-full max-w-5xl flex-1 px-4 sm:px-6">
+        <Outlet />
+      </div>
     </div>
   )
 }

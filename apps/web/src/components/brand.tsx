@@ -1,7 +1,11 @@
 import { cn } from '@/lib/utils'
 
-export function Wordmark() {
-  return <p className="text-sm font-medium text-primary">For Wealth</p>
+export function Wordmark({ className, ...props }: React.ComponentProps<'p'>) {
+  return (
+    <p className={cn('text-sm font-medium text-primary', className)} {...props}>
+      For Wealth
+    </p>
+  )
 }
 
 // What the app is for, as the page's main heading.

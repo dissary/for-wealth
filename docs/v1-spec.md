@@ -267,4 +267,4 @@ The theme (slice 1, decided 2026-10-21) lives as tokens in `apps/web/src/index.c
 - **Type**: Instrument Sans, bundled from npm. Headings use its width axis at 85% (narrower). All digits are tabular (the same width), so amounts line up.
 - **Corners**: 0.375rem base radius, tighter than shadcn's default.
 - **Light and dark**: follows the device setting, in CSS only. A manual switch can come later if wanted.
-- **Checked by tests** (`apps/web/test/`): text contrast meets WCAG AA in both modes, red and green appear only in the Budget tokens, components hard-code no colours, and the stylesheet loads nothing from another address.
+- **Checked by tests** (`apps/web/test/`): text contrast meets WCAG AA in both modes, red and green appear only in the Budget tokens, components hard-code no colours, the stylesheet loads nothing from another address, and transitions and animations stop when the device asks for reduced motion.
