@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatPeriodLabel, periodRange, stepPeriod, todayIn } from '../src/index.js'
+import { formatPeriodLabel, latestDate, periodRange, stepMonth, stepPeriod, todayIn } from '../src/index.js'
 
 describe('periodRange', () => {
   describe('week', () => {
@@ -97,6 +97,46 @@ describe('stepPeriod', () => {
     expect(stepPeriod('week', '2027-10-14', 1, BOUNDS)).toBe('2027-10-21')
     expect(stepPeriod('week', '2027-10-15', 1, BOUNDS)).toBe('2027-10-22')
     expect(stepPeriod('month', '2027-09-30', 1, BOUNDS)).toBe('2027-10-22')
+  })
+})
+
+describe('stepMonth', () => {
+  const BOUNDS = { earliest: '2000-01-01', latest: '2027-10-22' }
+
+  it.each([
+    ['2026-10', -1, '2026-09'],
+    ['2026-10', 1, '2026-11'],
+    ['2026-12', 1, '2027-01'],
+    ['2026-01', -1, '2025-12'],
+  ] as const)('steps %s by %i to %s', (month, direction, expected) => {
+    expect(stepMonth(month, direction, BOUNDS)).toBe(expected)
+  })
+
+  it('stops at the month holding 1 Jan 2000', () => {
+    expect(stepMonth('2000-02', -1, BOUNDS)).toBe('2000-01')
+    expect(stepMonth('2000-01', -1, BOUNDS)).toBeNull()
+  })
+
+  it('stops at the month holding one year after today', () => {
+    expect(stepMonth('2027-09', 1, BOUNDS)).toBe('2027-10')
+    expect(stepMonth('2027-10', 1, BOUNDS)).toBeNull()
+  })
+
+  // The last month moves on with today, which is taken in the user's zone.
+  describe('near midnight on the 1st', () => {
+    // 00:30 on 1 Nov in Kuala Lumpur (UTC+8) is still 31 Oct in UTC.
+    const KL_FIRST = new Date('2026-10-31T16:30:00Z')
+    // 23:30 on 31 Oct in New York (UTC−4) is already 1 Nov in UTC.
+    const NY_LAST = new Date('2026-11-01T03:30:00Z')
+    const boundsIn = (timeZone: string, now: Date) => ({ earliest: '2000-01-01', latest: latestDate(timeZone, now) })
+
+    it('opens the next month in a zone ahead of UTC', () => {
+      expect(stepMonth('2027-10', 1, boundsIn('Asia/Kuala_Lumpur', KL_FIRST))).toBe('2027-11')
+    })
+
+    it('keeps the last month in a zone behind UTC', () => {
+      expect(stepMonth('2027-10', 1, boundsIn('America/New_York', NY_LAST))).toBeNull()
+    })
   })
 })
 
