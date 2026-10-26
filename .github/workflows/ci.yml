@@ -21,8 +21,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
 
-    # Same image as compose.yaml. Starts with only the test database, which
-    # the API tests migrate themselves (apps/api/test/global-setup.ts).
+    # A throwaway Postgres for this job, on the same major version as the Neon
+    # dev project. Starts with only the test database, which the API tests
+    # migrate themselves (apps/api/test/global-setup.ts).
     services:
       postgres:
         image: postgres:18

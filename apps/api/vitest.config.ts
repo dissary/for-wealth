@@ -1,10 +1,17 @@
+import { existsSync, readFileSync } from 'node:fs'
+import { parseEnv } from 'node:util'
 import { defineConfig } from 'vitest/config'
 
-// Integration tests run against for_wealth_test, never the dev database.
-// CI can point at another server with TEST_DATABASE_URL.
-const databaseUrl =
-  process.env.TEST_DATABASE_URL ??
-  'postgres://for_wealth:for_wealth@localhost:5432/for_wealth_test'
+// Integration tests run against a database whose name ends in _test, never
+// the dev database. TEST_DATABASE_URL comes from the environment (CI sets it)
+// or from apps/api/.env.
+const envFile = new URL('./.env', import.meta.url)
+const fileEnv = existsSync(envFile) ? parseEnv(readFileSync(envFile, 'utf8')) : {}
+const databaseUrl = process.env.TEST_DATABASE_URL ?? fileEnv.TEST_DATABASE_URL
+
+if (!databaseUrl) {
+  throw new Error('Set TEST_DATABASE_URL in apps/api/.env (see .env.example)')
+}
 
 const databaseName = new URL(databaseUrl).pathname.slice(1)
 if (!databaseName.endsWith('_test')) {

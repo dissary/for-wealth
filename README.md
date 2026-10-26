@@ -10,13 +10,12 @@ Track, plan and understand your spending, day by day, week by week, month by mon
 apps/web          React + Vite frontend
 apps/api          Hono API, Drizzle schema and migrations (apps/api/drizzle)
 packages/shared   Types, Zod schemas, money and date helpers (no server-only code)
-db/init           SQL run once when the Postgres container is first created
 docs/             Spec and decision records
 ```
 
 ## Getting started
 
-Needs Node 22.12 or later, pnpm (the version in `package.json` → `packageManager`) and Podman.
+Needs Node 22.12 or later, pnpm (the version in `package.json` → `packageManager`) and access to the Neon dev project. The database is hosted on [Neon](https://neon.tech), so there's nothing to run locally besides the app, and every machine works against the same dev data ([ADR 0006](docs/adr/0006-dev-database-on-neon.md)).
 
 1. Install dependencies:
 
@@ -24,22 +23,23 @@ Needs Node 22.12 or later, pnpm (the version in `package.json` → `packageManag
    pnpm install
    ```
 
-2. Start Postgres 18. It listens on `127.0.0.1:5432` only, keeps its data in the `pgdata` volume, and on first start also creates the `for_wealth_test` database used by the tests:
+2. In the Neon dev project, check there's a `for_wealth` database. Create it under **Databases** if it's missing.
 
-   ```sh
-   podman compose up -d
-   ```
-
-3. Create the API's environment file and give it a real secret:
+3. Create the API's environment file:
 
    ```sh
    cp apps/api/.env.example apps/api/.env
-   sed -i "s|^BETTER_AUTH_SECRET=.*|BETTER_AUTH_SECRET=$(openssl rand -base64 32)|" apps/api/.env
    ```
 
-   `apps/api/.env.example` lists every variable. The API refuses to start if one is missing or invalid. Real `.env` files are gitignored; never commit one.
+   Then fill it in:
 
-4. Apply the database migrations:
+   - `DATABASE_URL`: from **Connect** in the Neon console, with **Connection pooling** off and the `for_wealth` database selected. Copy the connection string, not the `psql` command. Change `sslmode=require` to `sslmode=verify-full` to silence a warning from the `pg` driver.
+   - `BETTER_AUTH_SECRET`: the output of `openssl rand -base64 32`.
+   - `TEST_DATABASE_URL` is optional. You only need it to run the API tests on this machine (see [Checks](#checks)).
+
+   `apps/api/.env.example` lists every variable. The API refuses to start if one is missing or invalid. Real `.env` files are gitignored; never commit one, and move it between machines only through something private, such as a password manager.
+
+4. Apply the database migrations. This only does something the first time, or when a new migration has been added:
 
    ```sh
    pnpm db:migrate
@@ -51,7 +51,7 @@ Needs Node 22.12 or later, pnpm (the version in `package.json` → `packageManag
    pnpm dev
    ```
 
-   Open <http://localhost:5173> and choose **Create an account**. No real email is sent in development: the verification link is printed in this terminal. Open it in the same browser to verify the email and sign in. Vite forwards `/api/*` to the API on port 3000, so the browser only ever talks to one address, and the link and the session cookie use that address too.
+   Open <http://localhost:5173> and choose **Create an account**. No real email is sent in development: the verification link is printed in this terminal. Open it in the same browser to verify the email and sign in. Vite forwards `/api/*` to the API on the `PORT` set in `apps/api/.env` (3000 by default), so the browser only ever talks to one address, and the link and the session cookie use that address too.
 
    Signing up checks the password against [Have I Been Pwned](https://haveibeenpwned.com/Passwords), so it needs an internet connection. Only the first five characters of the password's SHA-1 hash leave the machine.
 
@@ -61,12 +61,17 @@ Setup is a one-off. After that:
 
 | To | Run |
 |---|---|
-| Start working | `podman compose up -d`, then `pnpm dev` |
+| Start working | `pnpm dev` |
 | Stop the app | `Ctrl+C` in the terminal running `pnpm dev` |
-| Stop Postgres | `podman compose stop` (your data is kept) |
 | Catch up after pulling new changes | `pnpm install`, then `pnpm db:migrate`. If the API then stops with `Invalid environment`, compare `apps/api/.env` with `apps/api/.env.example` and add the new variable. |
 
 The API's log, including any errors, appears in the terminal running `pnpm dev`. Emails such as verification links print there too, because the app sends no real email until slice 7 of the spec.
+
+### Working on more than one machine
+
+Every machine shares the dev database, so a migration applied from one is there for all of them. Run `pnpm db:migrate` only from `main`, or from the branch you're about to merge. Migrating from an unfinished branch changes the tables under every other machine's code. If you need to work on two unfinished schema changes at once, give each machine its own Neon branch and point its `DATABASE_URL` at that branch.
+
+If you run the tests locally, the same goes for them: they empty the tables in `for_wealth_test`, so don't run them on two machines at the same time.
 
 ## Database changes
 
@@ -93,13 +98,11 @@ pnpm typecheck
 pnpm test
 ```
 
-`pnpm test` needs Postgres running (step 2). The API tests always use the `for_wealth_test` database: they refuse to run against a database whose name doesn't end in `_test`, apply the migrations before the first test, and run one test file at a time. To run a single file:
+CI runs every check on each push and pull request, so running `pnpm test` locally is optional. To run the API tests here, create a `for_wealth_test` database in the Neon dev project and set `TEST_DATABASE_URL` in `apps/api/.env` to your `DATABASE_URL` with `/for_wealth_test` in place of `/for_wealth`. The API tests always use that database: they refuse to run against a database whose name doesn't end in `_test`, apply the migrations before the first test, and run one test file at a time. To run a single file:
 
 ```sh
 pnpm --filter @for-wealth/api test test/health.test.ts
 ```
-
-If the `for_wealth_test` database is missing because the volume was created before `db/init` existed, either create it by hand (`podman compose exec -T db createdb -U for_wealth for_wealth_test`) or reset the volume with `podman compose down -v`. Resetting deletes all local data.
 
 ### CI
 
@@ -111,13 +114,16 @@ The workflow's actions are pinned to a full commit SHA. To update one, use the S
 
 ## Troubleshooting
 
-- **Creating an account fails straight away, or the home page never shows you as signed in.** The API isn't running or has crashed. Check the terminal running `pnpm dev` for its error, and check Postgres is up with `podman compose ps`. `curl localhost:5173/api/health` says `ok` when the API can reach Postgres.
+- **Creating an account fails straight away, or the home page never shows you as signed in.** The API isn't running or has crashed. Check the terminal running `pnpm dev` for its error. `curl localhost:5173/api/health` says `ok` when the API can reach the database.
+- **The first request after a break is slow.** Neon suspends an idle database and takes a moment to wake it. Later requests are fast again.
+- **`/api` requests fail but the API log says it's listening.** Restart `pnpm dev` after changing `PORT`: Vite reads it only when it starts.
+- **The page opens on port 5174 instead of 5173.** Something else is using 5173, so Vite moved. Stop the other app, or set `BETTER_AUTH_URL` to the new address; otherwise verification links and sign-in cookies point at the wrong one.
 - **Creating an account says "Failed to check password".** The breach check couldn't reach Have I Been Pwned. Check the internet connection and try again.
 - **The API stops with `Invalid environment` naming `BETTER_AUTH_URL`.** Your `apps/api/.env` predates it. Add `BETTER_AUTH_URL=http://localhost:5173`.
-- **The API stops with `Invalid environment`.** A value in `apps/api/.env` is missing or wrong; the message names it. A blank `BETTER_AUTH_SECRET` means the file was copied from the example but never given a secret: run the `sed` line from step 3.
+- **The API stops with `Invalid environment`.** A value in `apps/api/.env` is missing or wrong; the message names it. A blank `DATABASE_URL` or `BETTER_AUTH_SECRET` means the file was copied from the example but never filled in: see step 3.
 - **The API stops saying `.env` was not found.** Step 3 was skipped.
-- **Postgres won't start because port 5432 is in use.** Another Postgres is already running on this machine. Stop it, then run `podman compose up -d` again.
-- **You want a clean database.** Run `podman compose down -v`, `podman compose up -d`, then `pnpm db:migrate`. This deletes all local data.
+- **Tests stop with `Set TEST_DATABASE_URL`.** Running them locally needs a test database: see [Checks](#checks). Otherwise, leave them to CI.
+- **You want a clean dev database.** In the Neon console, drop and recreate the `for_wealth` database, then run `pnpm db:migrate`. This deletes all dev data, on every machine.
 
 ## Dependencies
 
