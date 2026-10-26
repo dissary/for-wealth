@@ -100,6 +100,18 @@ describe.each<Mode>(['light', 'dark'])('%s mode', (mode) => {
   })
 })
 
+describe('motion', () => {
+  // Transitions and the dialog's animations come from many components, so
+  // the stylesheet turns them off in one place for anyone who asks the
+  // device for less motion.
+  it('stops transitions and animations when reduced motion is preferred', () => {
+    const block = themeCss.match(/@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\n\}/)?.[1]
+    expect(block, 'index.css has no reduced-motion @media block').toBeDefined()
+    expect(block).toMatch(/transition-duration:\s*0\.01ms\s*!important/)
+    expect(block).toMatch(/animation-duration:\s*0\.01ms\s*!important/)
+  })
+})
+
 describe('fonts', () => {
   // Fonts come from the app's own address. A font CDN would see every
   // visitor's IP address and could serve different files later.

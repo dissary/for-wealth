@@ -146,6 +146,18 @@
     }
 }
 
+/* Less motion when the device asks for it: hovers, the Dashboard fading
+   while a month loads and the dialog's entrance all happen at once. */
+@media (prefers-reduced-motion: reduce) {
+    /* Near zero rather than 0s, so transitionend and animationend still fire
+       for anything waiting on them. */
+    *, ::before, ::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

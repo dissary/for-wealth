@@ -64,7 +64,9 @@ function TransactionsPage() {
   const bounds = { earliest: EARLIEST_DATE, latest: addYears(today, 1) }
 
   return (
-    <main className="flex flex-col gap-6 py-8 sm:py-12">
+    // A reading column under the wider header: each row is just a Category
+    // and an amount, too far apart across the Dashboard's full width.
+    <main className="flex max-w-3xl flex-col gap-6 py-8 sm:py-12">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
           {formatPeriodLabel(period, date)}
