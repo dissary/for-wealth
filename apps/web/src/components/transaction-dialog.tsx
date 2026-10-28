@@ -4,7 +4,6 @@ import {
   type CalendarDate,
   CATEGORY_KINDS,
   categoryIdSchema,
-  type CategoryKind,
   type CurrencyCode,
   decimalPlacesOf,
   EARLIEST_DATE,
@@ -14,9 +13,11 @@ import {
 } from '@for-wealth/shared'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
+import { ConfirmAction } from '@/components/confirm-action'
+import { KindSwitch } from '@/components/kind-switch'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -29,13 +30,9 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/c
 import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { api } from '@/lib/api'
-import { categoriesQuery } from '@/lib/categories'
+import { categoriesQuery, KIND_LABELS, pickerOptions } from '@/lib/categories'
 import { type Transaction, TRANSACTIONS_KEY } from '@/lib/transactions'
 import { isTooManyWrites, TOO_MANY_WRITES } from '@/lib/write-limit'
-
-// In the switch's order: Expense first, as most Transactions are one.
-const KIND_LABELS: Record<CategoryKind, string> = { expense: 'Expense', income: 'Income' }
-const SWITCH_ORDER: readonly CategoryKind[] = ['expense', 'income']
 
 // The Expense / Income switch only chooses which Categories the picker
 // shows; the API takes no kind, as the Category decides it (ADR 0005).
@@ -72,17 +69,38 @@ export function TransactionDialog({ open, onOpenChange, transaction, ...formProp
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{transaction ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle>
-          <DialogDescription className="sr-only">
-            {transaction ? 'Change or delete this Transaction.' : 'Record money coming in or going out.'}
-          </DialogDescription>
+          <DialogTitle>{dialogTitle(transaction)}</DialogTitle>
+          {/* Saving an Estimate confirms it (v1-spec "Recurring Transactions"),
+              so that is said out loud; otherwise the title says it all. */}
+          {transaction?.estimate ? (
+            <DialogDescription>This is an Estimate. Saving confirms the amount.</DialogDescription>
+          ) : (
+            <DialogDescription className="sr-only">
+              {transaction ? 'Change or delete this Transaction.' : 'Record money coming in or going out.'}
+            </DialogDescription>
+          )}
         </DialogHeader>
         {/* Inside the content, so each opening starts with a fresh form. */}
         <TransactionForm {...formProps} transaction={transaction} onDone={close} />
-        {transaction && <DeleteTransaction id={transaction.id} onDeleted={close} />}
+        {transaction && (
+          <ConfirmAction
+            action="Delete"
+            question="Delete this Transaction for good? This can't be undone."
+            confirm="Delete Transaction"
+            working="Deleting…"
+            failed="The Transaction wasn't deleted."
+            run={() => api.transactions[':id'].$delete({ param: { id: transaction.id } })}
+            onDone={close}
+          />
+        )}
       </DialogContent>
     </Dialog>
   )
+}
+
+function dialogTitle(transaction: Transaction | undefined) {
+  if (!transaction) return 'Add Transaction'
+  return transaction.estimate ? 'Confirm Estimate' : 'Edit Transaction'
 }
 
 const FIELDS = ['categoryId', 'amount', 'date', 'note'] as const
@@ -153,39 +171,18 @@ function TransactionForm({
     form.setError('root', { message: "The Transaction wasn't saved. Try again." })
   }
 
-  // A Transaction keeps an archived Category, which the picker doesn't list,
-  // so it is added while editing one of its kind.
-  const listed = categories.data?.[kind] ?? []
-  const archived =
-    transaction && transaction.category.kind === kind && !listed.some((c) => c.id === transaction.category.id)
-      ? [{ id: transaction.category.id, name: `${transaction.category.name} (archived)` }]
-      : []
-  const options = [...archived, ...listed]
+  const options = pickerOptions(categories.data?.[kind] ?? [], transaction?.category, kind)
   const keypad = decimalPlacesOf(currency) === 0 ? 'numeric' : 'decimal'
 
   return (
     <form noValidate onSubmit={form.handleSubmit(onSubmit)}>
       <FieldGroup>
-        <fieldset className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
-          <legend className="sr-only">Income or Expense</legend>
-          {SWITCH_ORDER.map((value) => (
-            <label
-              key={value}
-              className="flex h-8 cursor-pointer items-center justify-center rounded-md text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-background has-checked:text-foreground has-checked:shadow-sm has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
-            >
-              <input
-                type="radio"
-                value={value}
-                className="sr-only"
-                {...form.register('kind', {
-                  // A Category of the other kind can't stay chosen.
-                  onChange: () => form.setValue('categoryId', ''),
-                })}
-              />
-              {KIND_LABELS[value]}
-            </label>
-          ))}
-        </fieldset>
+        <KindSwitch
+          field={form.register('kind', {
+            // A Category of the other kind can't stay chosen.
+            onChange: () => form.setValue('categoryId', ''),
+          })}
+        />
 
         <Field data-invalid={!!errors.categoryId}>
           <FieldLabel htmlFor="categoryId">Category</FieldLabel>
@@ -255,65 +252,9 @@ function TransactionForm({
 
         <FieldError errors={[errors.root]} />
         <Button type="submit" size="lg" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving…' : `Save ${KIND_LABELS[kind]}`}
+          {isSubmitting ? 'Saving…' : transaction?.estimate ? 'Confirm amount' : `Save ${KIND_LABELS[kind]}`}
         </Button>
       </FieldGroup>
     </form>
-  )
-}
-
-// Deleting is for good, so it asks first. The warning is in the words, not
-// in red: `destructive` is ink, as red is kept for Budgets (v1-spec "Design").
-function DeleteTransaction({ id, onDeleted }: { id: string; onDeleted: () => void }) {
-  const queryClient = useQueryClient()
-  const [confirming, setConfirming] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [error, setError] = useState<string>()
-
-  async function onDelete() {
-    setDeleting(true)
-    setError(undefined)
-    let res
-    try {
-      res = await api.transactions[':id'].$delete({ param: { id } })
-    } catch {
-      setDeleting(false)
-      return setError("Couldn't reach For Wealth. Check your connection and delete again.")
-    }
-    setDeleting(false)
-
-    // Already gone counts as deleted.
-    if (res.ok || res.status === 404) {
-      void queryClient.invalidateQueries({ queryKey: TRANSACTIONS_KEY })
-      return onDeleted()
-    }
-    setError(isTooManyWrites(res) ? TOO_MANY_WRITES : "The Transaction wasn't deleted. Try again.")
-  }
-
-  if (!confirming) {
-    return (
-      <div className="border-t pt-4">
-        <Button variant="ghost" onClick={() => setConfirming(true)}>
-          Delete
-        </Button>
-      </div>
-    )
-  }
-
-  return (
-    <div role="group" aria-labelledby="delete-question" className="flex flex-col gap-3 border-t pt-4">
-      <p id="delete-question" className="text-sm">
-        Delete this Transaction for good? This can't be undone.
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <Button variant="destructive" disabled={deleting} onClick={onDelete} autoFocus>
-          {deleting ? 'Deleting…' : 'Delete Transaction'}
-        </Button>
-        <Button variant="outline" disabled={deleting} onClick={() => setConfirming(false)}>
-          Keep it
-        </Button>
-      </div>
-      <FieldError>{error}</FieldError>
-    </div>
   )
 }

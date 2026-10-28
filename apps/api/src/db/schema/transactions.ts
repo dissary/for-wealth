@@ -1,8 +1,21 @@
 import { MAX_AMOUNT, NOTE_MAX_LENGTH } from '@for-wealth/shared'
 import { sql } from 'drizzle-orm'
-import { bigint, check, date, foreignKey, index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import {
+  bigint,
+  boolean,
+  check,
+  date,
+  foreignKey,
+  index,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from 'drizzle-orm/pg-core'
 import { users } from './auth.js'
 import { categories } from './categories.js'
+import { recurringTransactions } from './recurring-transactions.js'
 
 export const transactions = pgTable(
   'transactions',
@@ -20,6 +33,13 @@ export const transactions = pgTable(
     // A calendar date in the user's time zone, with no time.
     date: date({ mode: 'string' }).notNull(),
     note: text(),
+    // The Recurring Transaction that created it, and the Due Date it was
+    // created for, which stays put when its date is edited. Both null for one
+    // added by hand.
+    recurringTransactionId: uuid(),
+    dueDate: date({ mode: 'string' }),
+    // Holds a guessed amount until saving it confirms the real one.
+    estimate: boolean().notNull().default(false),
     // Orders Transactions within a day, most recently added first.
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true })
@@ -37,6 +57,26 @@ export const transactions = pgTable(
       columns: [table.userId, table.categoryId],
       foreignColumns: [categories.userId, categories.id],
     }),
+    // The same for its link, so the database refuses one to another user's
+    // Recurring Transaction. No cascade: those are stopped, not deleted.
+    foreignKey({
+      name: 'transactions_user_id_recurring_transaction_id_fk',
+      columns: [table.userId, table.recurringTransactionId],
+      foreignColumns: [recurringTransactions.userId, recurringTransactions.id],
+    }),
+    // One Transaction per Due Date, however many loads catch up at once.
+    unique('transactions_recurring_transaction_id_due_date_unique').on(
+      table.recurringTransactionId,
+      table.dueDate,
+    ),
+    check(
+      'transactions_due_date_with_recurring',
+      sql`(${table.recurringTransactionId} is null) = (${table.dueDate} is null)`,
+    ),
+    check(
+      'transactions_estimate_from_recurring',
+      sql`not ${table.estimate} or ${table.recurringTransactionId} is not null`,
+    ),
     // The API checks these first; the database holds the line if it doesn't.
     check('transactions_amount_range', sql`${table.amount} between 1 and ${sql.raw(String(MAX_AMOUNT))}`),
     check('transactions_date_from_2000', sql`${table.date} >= '2000-01-01'`),

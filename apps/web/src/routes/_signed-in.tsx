@@ -31,7 +31,7 @@ function SignedInLayout() {
     <div className="flex min-h-svh flex-col">
       <header className="border-b bg-card">
         {/* One row from sm up. On a phone the links take a second row, so the
-            app name, both links and the user's name all fit. */}
+            app name, the links and the user's name all fit. */}
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-x-8 px-4 sm:flex-nowrap sm:px-6">
           <Wordmark className="flex h-12 items-center font-heading text-lg font-semibold tracking-tight sm:h-14" />
           <nav aria-label="Main" className="order-last flex w-full items-center gap-5 sm:order-none sm:w-auto sm:flex-1">
@@ -50,6 +50,9 @@ function SignedInLayout() {
               activeOptions={{ includeSearch: false }}
             >
               Transactions
+            </Link>
+            <Link to="/recurring" className={NAV_LINK}>
+              Recurring
             </Link>
           </nav>
           <UserMenu me={me} />

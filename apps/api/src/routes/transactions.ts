@@ -18,7 +18,7 @@ import {
   updateTransaction,
 } from '../transactions.js'
 import { limitWrites } from '../write-limit.js'
-import { categoryNotFound } from './shared.js'
+import { catchingUp, categoryNotFound } from './shared.js'
 
 // A Day, a Week or a Month, named by any date in it, and optionally one
 // Category; nothing else, so no arbitrary ranges. Today, and so the bounds on
@@ -47,7 +47,7 @@ const idParam = validator('param', (value, c) => {
 export const transactions = new Hono<SignedInEnv>()
   .use(requireSession)
   .use(limitWrites)
-  .get('/', validator('query', parseFor(periodQuerySchema)), async (c) => {
+  .get('/', validator('query', parseFor(periodQuerySchema)), catchingUp, async (c) => {
     const listing = await listPeriod(c.get('user').id, c.req.valid('query'))
     if (!listing) return categoryNotFound(c)
     return c.json(listing)

@@ -1,10 +1,11 @@
 import { Link } from '@tanstack/react-router'
-import { useId } from 'react'
+import { type ReactNode, useId } from 'react'
 import type { View } from '@/lib/transactions'
 import { cn } from '@/lib/utils'
 
-// A Period's or month's Income or Expense total, in a <dl>. The label says
-// which is which, so the amount carries no sign. Given a view, the total opens
+// A Period's or month's Income or Expense total, or a figure Remaining is
+// worked out from, in a <dl>. The label says which is which, so the amount
+// carries no sign. A detail under the amount says more about it. Given a view, the total opens
 // those Transactions: the amount is the link, named "Income RM3,000.00", and
 // the whole figure, label too, can be clicked. Large, it's set in the narrow
 // heading cut, smaller on a phone so a six-figure total fits its half-width
@@ -12,11 +13,13 @@ import { cn } from '@/lib/utils'
 export function Total({
   label,
   amount,
+  detail,
   view,
   size = 'default',
 }: {
   label: string
   amount: string
+  detail?: ReactNode
   view?: View
   size?: 'default' | 'large'
 }) {
@@ -52,6 +55,7 @@ export function Total({
           amount
         )}
       </dd>
+      {detail && <dd className="text-sm text-muted-foreground tabular-nums">{detail}</dd>}
     </div>
   )
 }

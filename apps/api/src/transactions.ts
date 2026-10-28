@@ -6,7 +6,7 @@ import {
   periodRange,
   type TransactionChanges,
 } from '@for-wealth/shared'
-import { and, between, desc, eq, type SQL } from 'drizzle-orm'
+import { and, asc, between, desc, eq, type SQL } from 'drizzle-orm'
 import { db } from './db/client.js'
 import { categories, transactions } from './db/schema/index.js'
 
@@ -24,9 +24,10 @@ export async function createTransaction(userId: string, input: NewTransaction) {
   return created!
 }
 
-// Whether new Transactions can go under this Category: it must be one of
-// the user's and not archived, as archived ones are hidden from pickers.
-async function canFileUnder(userId: string, categoryId: string) {
+// Whether new Transactions, or Recurring Transactions, can go under this
+// Category: it must be one of the user's and not archived, as archived ones
+// are hidden from pickers.
+export async function canFileUnder(userId: string, categoryId: string) {
   const [category] = await db
     .select({ id: categories.id })
     .from(categories)
@@ -42,8 +43,9 @@ export const ownCategory = and(
 )
 
 // A Transaction as the API shows it: with its Category's name and kind,
-// which say whether it is Income or an Expense (ADR 0005). Only the user's
-// own, narrowed further by `conditions`.
+// which say whether it is Income or an Expense (ADR 0005), and the Recurring
+// Transaction that created it, if one did. Only the user's own, narrowed
+// further by `conditions`.
 function selectTransactions(userId: string, ...conditions: (SQL | undefined)[]) {
   return db
     .select({
@@ -51,6 +53,8 @@ function selectTransactions(userId: string, ...conditions: (SQL | undefined)[]) 
       amount: transactions.amount,
       date: transactions.date,
       note: transactions.note,
+      recurringTransactionId: transactions.recurringTransactionId,
+      estimate: transactions.estimate,
       category: { id: categories.id, name: categories.name, kind: categories.kind },
     })
     .from(transactions)
@@ -68,8 +72,9 @@ export async function findTransaction(userId: string, id: string) {
 // Changes the fields given, under the same rules as adding: a new Category
 // must be one of the user's that isn't archived. Keeping the Category it has
 // is always allowed, archived or not, so an old Transaction can still be
-// edited. Whichever save comes last wins. Says which wasn't found when the
-// Transaction or the new Category isn't the user's.
+// edited. Saving an Estimate confirms it, whatever changed. Whichever save
+// comes last wins. Says which wasn't found when the Transaction or the new
+// Category isn't the user's.
 export async function updateTransaction(userId: string, id: string, changes: TransactionChanges) {
   const [current] = await db
     .select({ categoryId: transactions.categoryId })
@@ -85,12 +90,10 @@ export async function updateTransaction(userId: string, id: string, changes: Tra
     return { notFound: 'category' } as const
   }
 
-  if (Object.keys(changes).length > 0) {
-    await db
-      .update(transactions)
-      .set(changes)
-      .where(and(eq(transactions.userId, userId), eq(transactions.id, id)))
-  }
+  await db
+    .update(transactions)
+    .set({ ...changes, estimate: false })
+    .where(and(eq(transactions.userId, userId), eq(transactions.id, id)))
   // Null if it was deleted in the meantime.
   const updated = await findTransaction(userId, id)
   return updated ? { updated } : ({ notFound: 'transaction' } as const)
@@ -143,4 +146,14 @@ export async function listPeriod(
   for (const row of rows) totals[row.category.kind] += row.amount
 
   return { period, date, category, totals, transactions: rows }
+}
+
+// Every unconfirmed Estimate the user has, of any month, oldest first, so a
+// forgotten one keeps asking to be confirmed.
+export function listEstimates(userId: string) {
+  return selectTransactions(userId, eq(transactions.estimate, true)).orderBy(
+    asc(transactions.date),
+    asc(transactions.createdAt),
+    asc(transactions.id),
+  )
 }

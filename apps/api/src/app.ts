@@ -9,6 +9,7 @@ import { categories } from './routes/categories.js'
 import { dashboard } from './routes/dashboard.js'
 import { health } from './routes/health.js'
 import { me } from './routes/me.js'
+import { recurring } from './routes/recurring.js'
 import { transactions } from './routes/transactions.js'
 import { holdToResponseFloor } from './response-floor.js'
 
@@ -41,6 +42,7 @@ const app = new Hono()
   .route('/transactions', transactions)
   .route('/dashboard', dashboard)
   .route('/budgets', budgets)
+  .route('/recurring', recurring)
 
 export type AppType = typeof app
 export default app
