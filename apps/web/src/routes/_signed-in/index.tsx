@@ -1,6 +1,8 @@
 import {
   addYears,
+  budgetPerDay,
   budgetProgress,
+  type CalendarDate,
   type CalendarMonth,
   type CurrencyCode,
   dashboardMonthSchema,
@@ -116,6 +118,7 @@ function DashboardPage() {
         <MonthView
           dashboard={dashboard.data}
           currency={me.currency}
+          today={today}
           stale={dashboard.isPlaceholderData}
           onAdd={add}
         />
@@ -164,11 +167,15 @@ function StepLink({ to, direction }: { to: CalendarMonth | null; direction: -1 |
 function MonthView({
   dashboard,
   currency,
+  today,
   stale,
   onAdd,
 }: {
   dashboard: Dashboard
   currency: CurrencyCode
+  // In the user's time zone, so this month's per-day figures move on at
+  // their midnight.
+  today: CalendarDate
   // Still the previous month's, while the new one loads.
   stale: boolean
   onAdd: () => void
@@ -232,7 +239,15 @@ function MonthView({
                   <span className="w-10 text-right text-sm text-muted-foreground tabular-nums">
                     {total > 0 && formatShare(total, totals.expense)}
                   </span>
-                  {budget !== null && <BudgetStanding spent={total} limit={budget} currency={currency} />}
+                  {budget !== null && (
+                    <BudgetStanding
+                      spent={total}
+                      limit={budget}
+                      currency={currency}
+                      month={dashboard.month}
+                      today={today}
+                    />
+                  )}
                 </Link>
               </li>
             ))}
@@ -246,9 +261,23 @@ function MonthView({
 // A budgeted row's bar and where it stands in words, under its name and
 // amount; the limit sits under the amount spent, so the two read as one
 // figure. Green while there's money left, red once Overspent, and only for
-// a Budget: a row without one has no bar and no colour (v1-spec "Budgets").
-function BudgetStanding({ spent, limit, currency }: { spent: number; limit: number; currency: CurrencyCode }) {
+// a Budget: a row without one has no bar and no colour. This month's money
+// left also reads as a daily pace, "RM35.00/day" (v1-spec "Budgets").
+function BudgetStanding({
+  spent,
+  limit,
+  currency,
+  month,
+  today,
+}: {
+  spent: number
+  limit: number
+  currency: CurrencyCode
+  month: CalendarMonth
+  today: CalendarDate
+}) {
   const progress = budgetProgress(spent, limit)
+  const daily = progress.overspent ? null : budgetPerDay(progress.left, month, today)
   return (
     <>
       {/* The words say what the bar shows, so screen readers skip it. */}
@@ -267,6 +296,9 @@ function BudgetStanding({ spent, limit, currency }: { spent: number; limit: numb
         {progress.overspent
           ? `Overspent by ${formatAmount(progress.by, currency)}`
           : `${formatAmount(progress.left, currency)} left`}
+        {daily !== null && (
+          <span className="font-normal text-muted-foreground"> · {formatAmount(daily, currency)}/day</span>
+        )}
       </span>
       <span className="text-right text-sm text-muted-foreground tabular-nums">of {formatAmount(limit, currency)}</span>
     </>
