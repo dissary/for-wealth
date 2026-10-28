@@ -61,6 +61,8 @@ describe('POST /api/transactions', () => {
           amount: 1250,
           date: TODAY,
           note: 'Lunch',
+          recurringTransactionId: null,
+          estimate: false,
           category: { id: food, name: 'Food', kind: 'expense' },
         },
       ],
@@ -393,6 +395,8 @@ describe('PATCH /api/transactions/:id', () => {
       amount: 980,
       date: TODAY,
       note: 'Lunch',
+      recurringTransactionId: null,
+      estimate: false,
       category: { id: food, name: 'Food', kind: 'expense' },
     })
   })
@@ -410,6 +414,8 @@ describe('PATCH /api/transactions/:id', () => {
       amount: 1250,
       date: '2026-03-02',
       note: 'Grab',
+      recurringTransactionId: null,
+      estimate: false,
       category: { id: transport, name: 'Transport', kind: 'expense' },
     })
     expect(rows(await list(cookie, { period: 'day', date: TODAY }))).toEqual([])

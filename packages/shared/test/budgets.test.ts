@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   budgetLimitsSchema,
-  budgetPerDay,
   budgetProgress,
-  formatAmount,
   limitIn,
   limitInputSchema,
   MAX_AMOUNT,
@@ -159,39 +157,5 @@ describe('budgetProgress', () => {
   it('is Overspent past the limit, by how much, with the bar no wider than full', () => {
     expect(budgetProgress(54_000, 50_000)).toEqual({ fill: 1, overspent: true, by: 4_000 })
     expect(budgetProgress(50_001, 50_000)).toEqual({ fill: 1, overspent: true, by: 1 })
-  })
-})
-
-describe('budgetPerDay', () => {
-  // v1-spec "Budgets": RM420 left ÷ 12 days = RM35/day, counting today.
-  it('spreads the money left over the days left in the month, counting today', () => {
-    expect(budgetPerDay(42_000, '2026-10', '2026-10-20')).toBe(3_500)
-  })
-
-  // So it never shows more than is really left.
-  it('rounds down to a whole minor unit', () => {
-    expect(budgetPerDay(42_011, '2026-10', '2026-10-20')).toBe(3_500)
-    expect(budgetPerDay(100, '2026-10', '2026-10-29')).toBe(33)
-  })
-
-  it('is all the money left on the last day of the month', () => {
-    expect(budgetPerDay(42_011, '2026-10', '2026-10-31')).toBe(42_011)
-    expect(budgetPerDay(42_011, '2026-02', '2026-02-28')).toBe(42_011)
-  })
-
-  it('is 0 with nothing left', () => {
-    expect(budgetPerDay(0, '2026-10', '2026-10-20')).toBe(0)
-  })
-
-  // A whole minor unit is a whole yen, as JPY has no decimal places: ¥1,000
-  // over 3 days shows as ¥333, never ¥333.33.
-  it('reads as whole yen in JPY', () => {
-    expect(formatAmount(budgetPerDay(1_000, '2026-10', '2026-10-29')!, 'JPY')).toBe('JP¥333')
-  })
-
-  // v1-spec "Budgets": for this month only, so the user's today is in it.
-  it('has no figure for a past or future month', () => {
-    expect(budgetPerDay(42_000, '2026-09', '2026-10-20')).toBeNull()
-    expect(budgetPerDay(42_000, '2026-11', '2026-10-20')).toBeNull()
   })
 })

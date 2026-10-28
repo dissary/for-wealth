@@ -17,6 +17,8 @@ import { createFileRoute, Link, redirect } from '@tanstack/react-router'
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from 'lucide-react'
 import { useState } from 'react'
 import { z } from 'zod'
+import { EstimateLabel, RecurringMark } from '@/components/markers'
+import { RowButton } from '@/components/row-button'
 import { Total } from '@/components/total'
 import { TransactionDialog } from '@/components/transaction-dialog'
 import { Button } from '@/components/ui/button'
@@ -299,7 +301,8 @@ function byDate(transactions: Transaction[]): [CalendarDate, Transaction[]][] {
   return groups
 }
 
-// Each row opens the Transaction in the dialog, to edit or delete it.
+// Each row opens the Transaction in the dialog, to edit or delete it, or to
+// confirm an Estimate.
 function TransactionList({
   transactions,
   currency,
@@ -313,14 +316,13 @@ function TransactionList({
     <ul aria-label="Transactions" className="divide-y border-t">
       {transactions.map((transaction) => (
         <li key={transaction.id}>
-          <button
-            type="button"
-            aria-haspopup="dialog"
-            onClick={() => onEdit(transaction)}
-            className="-mx-2 flex w-[calc(100%+1rem)] items-baseline justify-between gap-4 rounded-md px-2 py-3 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
+          <RowButton onClick={() => onEdit(transaction)}>
             <span className="min-w-0">
-              <span className="block font-medium">{transaction.category.name}</span>
+              <span className="flex items-center gap-2 font-medium">
+                {transaction.category.name}
+                {transaction.recurringTransactionId && <RecurringMark />}
+                {transaction.estimate && <EstimateLabel />}
+              </span>
               {transaction.note && (
                 <span className="block truncate text-sm text-muted-foreground">{transaction.note}</span>
               )}
@@ -329,7 +331,7 @@ function TransactionList({
             <span className="shrink-0 tabular-nums">
               {formatAmount(transaction.amount, currency, transaction.category.kind)}
             </span>
-          </button>
+          </RowButton>
         </li>
       ))}
     </ul>

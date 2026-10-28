@@ -165,3 +165,30 @@ export function putBudgets(cookie: string | undefined, query: Record<string, str
     body: JSON.stringify(body),
   })
 }
+
+export function getRecurring(cookie: string | undefined) {
+  return app.request('/api/recurring', { headers: cookie ? { cookie } : {} })
+}
+
+export function postRecurring(cookie: string | undefined, body: unknown) {
+  return app.request('/api/recurring', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: APP_ORIGIN, ...(cookie ? { cookie } : {}) },
+    body: JSON.stringify(body),
+  })
+}
+
+export function patchRecurring(cookie: string | undefined, id: string, body: unknown) {
+  return app.request(`/api/recurring/${id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', origin: APP_ORIGIN, ...(cookie ? { cookie } : {}) },
+    body: JSON.stringify(body),
+  })
+}
+
+export function stopRecurring(cookie: string | undefined, id: string) {
+  return app.request(`/api/recurring/${id}/stop`, {
+    method: 'POST',
+    headers: { origin: APP_ORIGIN, ...(cookie ? { cookie } : {}) },
+  })
+}

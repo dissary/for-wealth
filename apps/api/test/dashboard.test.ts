@@ -46,6 +46,7 @@ async function setBudgets(
 type Dashboard = {
   month: string
   totals: { income: number; expense: number }
+  plan: { expectedIncome: number; commitments: number; freeToSpend: number; remaining: number }
   expenseCategories: {
     category: { id: string; name: string; archived: boolean }
     total: number
@@ -85,6 +86,10 @@ describe('GET /api/dashboard', () => {
     expect(await res.json()).toEqual({
       month: MONTH,
       totals: { income: 520_000, expense: 182_300 },
+      // With no Recurring Transactions, nothing is committed or Upcoming.
+      plan: { expectedIncome: 520_000, commitments: 0, freeToSpend: 520_000, remaining: 337_700 },
+      commitmentsByCategory: {},
+      budgetsOverBy: null,
       // Categories with no Expenses this month are left out.
       expenseCategories: [
         { category: { id: expense.Food, name: 'Food', archived: false }, total: 82_000, budget: null },
@@ -92,6 +97,8 @@ describe('GET /api/dashboard', () => {
         { category: { id: expense.Housing, name: 'Housing', archived: false }, total: 50_000, budget: null },
         { category: { id: expense.Health, name: 'Health', archived: false }, total: 300, budget: null },
       ],
+      upcoming: [],
+      estimates: [],
     })
   })
 
@@ -134,7 +141,12 @@ describe('GET /api/dashboard', () => {
 
     const body = await dashboardFor(cookie)
 
-    expect(body).toEqual({ month: MONTH, totals: { income: 0, expense: 0 }, expenseCategories: [] })
+    expect(body).toMatchObject({
+      month: MONTH,
+      totals: { income: 0, expense: 0 },
+      plan: { expectedIncome: 0, commitments: 0, freeToSpend: 0, remaining: 0 },
+      expenseCategories: [],
+    })
   })
 })
 

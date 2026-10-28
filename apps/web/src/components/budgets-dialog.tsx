@@ -1,5 +1,6 @@
 import {
   amountForInput,
+  budgetsOverBy,
   type CalendarMonth,
   type CurrencyCode,
   decimalPlacesOf,
@@ -10,8 +11,9 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
+import { BudgetsWarning } from '@/components/budgets-warning'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -37,18 +39,27 @@ function formSchema(currency: CurrencyCode) {
 type FormInput = z.input<ReturnType<typeof formSchema>>
 type FormOutput = z.output<ReturnType<typeof formSchema>>
 
+// What the limits are weighed against for the warning: the month's Expected
+// Income and its Commitments per Expense Category.
+interface WarningFigures {
+  expectedIncome: number
+  commitmentsByCategory: Record<string, number>
+}
+
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   month: CalendarMonth
   currency: CurrencyCode
+  // Undefined until the Dashboard has the month's own figures.
+  warningFigures?: WarningFigures | undefined
 }
 
 // Sets a month's Budgets: a dialog over the page, a sheet on a phone. Each
 // change applies from this month on, so later months carry it and earlier
 // months never change (ADR 0007). Saving closes it and refreshes the
 // Dashboard.
-export function BudgetsDialog({ open, onOpenChange, month, currency }: Props) {
+export function BudgetsDialog({ open, onOpenChange, month, currency, warningFigures }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -59,18 +70,36 @@ export function BudgetsDialog({ open, onOpenChange, month, currency }: Props) {
           </DialogDescription>
         </DialogHeader>
         {/* Inside the content, so each opening starts with a fresh form. */}
-        <BudgetsLoader month={month} currency={currency} onDone={() => onOpenChange(false)} />
+        <BudgetsLoader
+          month={month}
+          currency={currency}
+          warningFigures={warningFigures}
+          onDone={() => onOpenChange(false)}
+        />
       </DialogContent>
     </Dialog>
   )
 }
 
-function BudgetsLoader({ month, currency, onDone }: Omit<Props, 'open' | 'onOpenChange'> & { onDone: () => void }) {
+function BudgetsLoader({
+  month,
+  currency,
+  warningFigures,
+  onDone,
+}: Omit<Props, 'open' | 'onOpenChange'> & { onDone: () => void }) {
   const budgets = useQuery(budgetsQuery(month))
   // The form starts on the limits it's given, so it waits for the latest
   // rather than starting on ones saved since elsewhere.
   if (budgets.data && !budgets.isFetching) {
-    return <BudgetsForm budgets={budgets.data} month={month} currency={currency} onDone={onDone} />
+    return (
+      <BudgetsForm
+        budgets={budgets.data}
+        month={month}
+        currency={currency}
+        warningFigures={warningFigures}
+        onDone={onDone}
+      />
+    )
   }
   if (budgets.isError) {
     return (
@@ -89,11 +118,13 @@ function BudgetsForm({
   budgets,
   month,
   currency,
+  warningFigures,
   onDone,
 }: {
   budgets: Budget[]
   month: CalendarMonth
   currency: CurrencyCode
+  warningFigures: WarningFigures | undefined
   onDone: () => void
 }) {
   const queryClient = useQueryClient()
@@ -143,6 +174,8 @@ function BudgetsForm({
   }
 
   const keypad = decimalPlacesOf(currency) === 0 ? 'numeric' : 'decimal'
+  const typed = useWatch({ control: form.control, name: 'limits' })
+  const overBy = warningFigures ? overByTyped(typed, currency, warningFigures) : null
 
   return (
     <form noValidate onSubmit={form.handleSubmit(onSubmit)}>
@@ -178,6 +211,8 @@ function BudgetsForm({
           </ul>
         </FieldSet>
 
+        {/* The Dashboard's warning, as the limits are typed. */}
+        {overBy !== null && <BudgetsWarning overBy={overBy} currency={currency} />}
         <FieldError errors={[errors.root]} />
         {/* Nothing is saved until every field is valid. */}
         <Button type="submit" size="lg" disabled={isSubmitting}>
@@ -186,4 +221,13 @@ function BudgetsForm({
       </FieldGroup>
     </form>
   )
+}
+
+// How far the typed limits, plus Commitments in Categories without one, go
+// past Expected Income. Null while a field can't be read, so the warning
+// waits for a whole amount rather than flickering as one is typed.
+function overByTyped(typed: FormInput['limits'], currency: CurrencyCode, figures: WarningFigures) {
+  const parsed = formSchema(currency).safeParse({ limits: typed })
+  if (!parsed.success) return null
+  return budgetsOverBy({ limits: parsed.data.limits, ...figures })
 }

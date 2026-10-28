@@ -15,6 +15,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as SignedInIndexRouteImport } from './routes/_signed-in/index'
+import { Route as SignedInRecurringRouteImport } from './routes/_signed-in/recurring'
 import { Route as SignedInTransactionsRouteImport } from './routes/_signed-in/transactions'
 
 const SignedInRoute = SignedInRouteImport.update({
@@ -46,6 +47,11 @@ const SignedInIndexRoute = SignedInIndexRouteImport.update({
   path: '/',
   getParentRoute: () => SignedInRoute,
 } as any)
+const SignedInRecurringRoute = SignedInRecurringRouteImport.update({
+  id: '/recurring',
+  path: '/recurring',
+  getParentRoute: () => SignedInRoute,
+} as any)
 const SignedInTransactionsRoute = SignedInTransactionsRouteImport.update({
   id: '/transactions',
   path: '/transactions',
@@ -58,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/recurring': typeof SignedInRecurringRoute
   '/transactions': typeof SignedInTransactionsRoute
 }
 export interface FileRoutesByTo {
@@ -65,6 +72,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/recurring': typeof SignedInRecurringRoute
   '/transactions': typeof SignedInTransactionsRoute
   '/': typeof SignedInIndexRoute
 }
@@ -75,6 +83,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/_signed-in/recurring': typeof SignedInRecurringRoute
   '/_signed-in/transactions': typeof SignedInTransactionsRoute
   '/_signed-in/': typeof SignedInIndexRoute
 }
@@ -86,6 +95,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sign-in'
     | '/sign-up'
+    | '/recurring'
     | '/transactions'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -93,6 +103,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sign-in'
     | '/sign-up'
+    | '/recurring'
     | '/transactions'
     | '/'
   id:
@@ -102,6 +113,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sign-in'
     | '/sign-up'
+    | '/_signed-in/recurring'
     | '/_signed-in/transactions'
     | '/_signed-in/'
   fileRoutesById: FileRoutesById
@@ -158,6 +170,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignedInIndexRouteImport
       parentRoute: typeof SignedInRoute
     }
+    '/_signed-in/recurring': {
+      id: '/_signed-in/recurring'
+      path: '/recurring'
+      fullPath: '/recurring'
+      preLoaderRoute: typeof SignedInRecurringRouteImport
+      parentRoute: typeof SignedInRoute
+    }
     '/_signed-in/transactions': {
       id: '/_signed-in/transactions'
       path: '/transactions'
@@ -169,11 +188,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface SignedInRouteChildren {
+  SignedInRecurringRoute: typeof SignedInRecurringRoute
   SignedInTransactionsRoute: typeof SignedInTransactionsRoute
   SignedInIndexRoute: typeof SignedInIndexRoute
 }
 
 const SignedInRouteChildren: SignedInRouteChildren = {
+  SignedInRecurringRoute: SignedInRecurringRoute,
   SignedInTransactionsRoute: SignedInTransactionsRoute,
   SignedInIndexRoute: SignedInIndexRoute,
 }
