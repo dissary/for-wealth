@@ -93,7 +93,7 @@ Decided on 2026-10-24, for slice 3. Slices 4 and 5 add Budgets, Free to Spend, R
 
 - Lives at `/`, so signing in without a `redirect` lands here. The header's links read Dashboard, then Transactions.
 - Shows one month: its Income total, its Expense total, and **Expenses by Category**. Income isn't broken down by Category.
-- No net figure, Free to Spend, Remaining or per-day figure until slice 5. Before Recurring Transactions exist, Remaining would be Income recorded minus Expenses, which is negative every month until the salary is recorded; in slice 5, Expected Income counts recurring Income still due, so the figures arrive together then.
+- No net figure, Free to Spend, Remaining or per-day figure until slice 5 (see "The Dashboard in slice 5"). Before Recurring Transactions exist, Remaining would be Income recorded minus Expenses, which is negative every month until the salary is recorded; in slice 5, Expected Income counts recurring Income still due, so the figures arrive together then.
 - **Expenses by Category**: one row per Expense Category with Expenses that month, showing its name, its total and its share of the month's Expenses ("Food RM820.00 · 34%"). Largest total first; equal totals fall back to the Category's position. Categories with no Expenses that month are left out (from slice 4, unless they have a Budget that month). An archived Category with Expenses that month is listed as "Food (archived)".
 - Shares are whole percentages. A share under 1% shows "<1%", never "0%". Rounded shares may not add up to 100%, and nothing adjusts them.
 - No bars in slice 3. In slice 4, each row gains its Budget limit and a progress bar, so a bar always means Budget progress.
@@ -123,7 +123,7 @@ Decided on 2026-10-24, for slice 3. Slices 4 and 5 add Budgets, Free to Spend, R
 - Budgets are monthly only. A month shows a per-day figure for what's left (e.g. RM420 left ÷ 12 days = RM35/day).
 - Each Category's limit carries forward to later months until it is changed or removed for that Category ([ADR 0007](adr/0007-budgets-stored-as-changes-per-category.md)). Editing November leaves October unchanged.
 - Unspent or overspent money **does not** carry over. Every month starts fresh.
-- If the Budgets add up to more than Free to Spend, show a warning. Don't block it. (Slice 5, once Free to Spend exists.)
+- If the Budgets don't fit the month's Expected Income, show a warning. Don't block it. (Slice 5; the exact test is under "The Dashboard in slice 5", as comparing with Free to Spend would count a Commitment in a budgeted Category twice.)
 
 Decided on 2026-10-28, for slice 4.
 
@@ -149,6 +149,36 @@ Decided on 2026-10-28, for slice 4.
 - Editing a Recurring Transaction affects only Transactions it hasn't created yet. Past ones never change.
 - Yearly items count as a Commitment only in the month they're due.
 
+Decided on 2026-10-29, for slice 5.
+
+- **Fields**: a Category (Income or Expense, as for a Transaction), an amount, an optional note, a schedule, a start date, and whether the amount varies. There is no name: the Category and the note identify it. The amount and note follow a Transaction's rules; when the amount varies, it is the Estimate's guess.
+- **Schedules**: monthly on day 1–31, weekly on a weekday (Monday to Sunday), or yearly on a day and month (29 Feb allowed). A day the month doesn't have falls back to its last day: day 31 is 30 Apr, and 29 Feb is 28 Feb in a year without one.
+- **Starting**: the start date runs from today up to one year after today, in the user's time zone, so nothing is ever backfilled; earlier ones are added by hand as ordinary Transactions. The first **Due Date** is the schedule's first one on or after the start date, and the form shows it ("First on Tue, 25 Nov 2026"). There is no end date.
+- **Creating Transactions**: each time the user's Transactions, Dashboard or Recurring Transactions are loaded, every Due Date on or before today, in the user's time zone, that hasn't been created yet is created first, dated on its Due Date ([ADR 0008](adr/0008-recurring-transactions-created-on-read.md)). After a long absence every missed Due Date is created at once. A Recurring Transaction keeps its next Due Date, which moves on as Transactions are created; whether a Transaction exists for a Due Date is never checked. These writes don't count towards the write limit.
+- **Skipping**: delete that Due Date's Transaction. It is never created again. There is no skip button.
+- **Editing** changes only Transactions not yet created. A schedule change never creates a second Transaction in a period that already has one: the next Due Date becomes the new schedule's first one on or after the start of the period (month, week or year, under the old schedule) after the last Due Date created, or on or after the start date when none has been, and never before today. Rent created on 1 Nov and moved to the 5th on 3 Nov is next due on 5 Dec. There is no start date on edit.
+- **Stopping**: after a confirmation step, a Recurring Transaction is stopped: it is kept, creates nothing more, and can't be edited or restarted (add a new one) ([ADR 0009](adr/0009-recurring-transactions-stopped-not-deleted.md)). It leaves Upcoming and every later month at once, including later Due Dates this month. Anything due up to today is created first, so stopping on a Due Date keeps that day's Transaction, as it would had the page been loaded earlier that day. The Transactions it created stay, as ordinary Transactions.
+- **Limit**: at most 100 Recurring Transactions that aren't stopped per user, so catching up stays cheap. Adding the 101st is refused with 409 `RECURRING_LIMIT`.
+- **The Transactions it creates** are ordinary Transactions with a link back: they can be edited and deleted, they count towards Budgets once created (never before), and they follow their own date and Category. One moved to another month counts as a Commitment there; one moved to an Income Category counts towards Expected Income instead.
+- **Estimates**: when the amount varies, each Transaction is created as an Estimate holding the guess. Either kind can vary. An Estimate counts in every total, Budgets included, straight away. Saving it from the edit dialog confirms it, whatever changed; the dialog is titled "Confirm Estimate", says "This is an Estimate. Saving confirms the amount." and its button reads "Confirm amount". The guess for later Due Dates doesn't change on its own.
+- **Archived Categories**: a Recurring Transaction can't be put under one (404, as for a Transaction). Keeping the archived Category it has is allowed. What happens to a Recurring Transaction whose Category is archived is slice 6's question, like Budgets.
+- **The Recurring page** lives at `/recurring`, linked from the header (Dashboard · Transactions · Recurring) and from the Dashboard's Upcoming heading. It lists the Recurring Transactions that aren't stopped by next Due Date, each with its Category, note, schedule ("Every month on the 25th", "Every Monday", "Every year on 29 Feb"), amount ("+" for Income) and next Due Date, and marks the ones whose amount varies with "Varies" (Estimate is a Transaction's word). Stopped ones sit under a collapsed "Stopped" heading, read-only. Adding and editing happen in a dialog (a sheet on a phone), as for Transactions.
+- **On the Transactions page**, rows show a small recurring marker and an "Estimate" label where they apply. Due Dates not yet created are never shown there; planning belongs on the Dashboard.
+- As built in slice 5: `GET /api/recurring` answers `{ active, stopped }`; `POST /api/recurring` adds one (201); `PATCH /api/recurring/:id` changes any of Category, amount, note, schedule and whether it varies; `POST /api/recurring/:id/stop` stops it (204, and again for one already stopped). One that isn't the user's, doesn't exist, whose ID isn't an ID, or that is stopped (for `PATCH`) gets 404 `RECURRING_NOT_FOUND`. A schedule is `{ frequency: 'monthly', day }`, `{ frequency: 'weekly', weekday }` (1 for Monday to 7 for Sunday) or `{ frequency: 'yearly', month, day }`. Transactions gain `recurringTransactionId` (or `null`) and `estimate`. There is no separate confirm endpoint: `PATCH /api/transactions/:id` confirms an Estimate.
+- Stored in a `recurring_transactions` table: `user_id`, `category_id`, amount, note, frequency and its day, weekday or month, whether it varies, start date, next Due Date, last Due Date created, and when it was stopped. Its foreign key covers `(user_id, category_id)`. `transactions` gains `recurring_transaction_id` and `due_date` (the Due Date it was created for, which never changes when its date is edited), with a foreign key covering `(user_id, recurring_transaction_id)`, so the database refuses a link to another user's Recurring Transaction, and `estimate`. Transactions are unique per Recurring Transaction and Due Date, so two loads catching up at once can't both create one; catching up also locks the Recurring Transactions it moves on.
+
+### The Dashboard in slice 5
+
+Decided on 2026-10-29.
+
+- **Remaining** is the headline, with its per-day figure underneath. Below zero, it reads "Over by RM240.00", in ink: red and green stay with Budgets. The per-day figure follows the Budget rule: this month only, Remaining ÷ the days left counting today, rounded down to a whole minor unit, and none when Remaining is zero or less.
+- Beside it, four figures: **Expected Income** (with "RM3,000.00 recorded" underneath), **Commitments**, **Free to Spend** and Expenses. Expected Income's recorded figure and Expenses open that Month's Transactions, as the slice 3 totals did.
+- Then Expenses by Category with its Budgets, as in slice 4, and beside it **Upcoming** and **Estimates to confirm**.
+- **Upcoming** lists the shown month's Due Dates not yet created, in date order, with date, Category, note and amount, Estimates marked. It is empty for past months (everything due has been created), holds what's left of this month, and holds every Due Date of a future month. When there are none it says so.
+- **Estimates to confirm** lists every unconfirmed Estimate, of any month, oldest first, whichever month is shown, so a forgotten one keeps asking. Each opens the edit dialog to confirm it. The list is hidden when there are none.
+- **The Budgets warning**: when the shown month's Budgets plus its Commitments in Categories without a Budget come to more than Expected Income, an ink warning above the Budget rows says "Budgets and Commitments come to RM320.00 more than Expected Income." A Commitment in a budgeted Category is covered by that Budget, so nothing is counted twice. The Edit Budgets dialog shows the same warning as limits are typed. It never blocks saving.
+- `GET /api/dashboard` gains `plan: { expectedIncome, commitments, freeToSpend, remaining }`, `commitmentsByCategory` (Expense Category ID to its Commitments), `budgetsOverBy` (or `null`), `upcoming` and `estimates`. The per-day figure is worked out in the browser, as for Budgets, so it moves on at the user's midnight.
+
 ### Dashboard maths (for one month)
 
 ```
@@ -158,6 +188,12 @@ Free to Spend   = Expected Income − Commitments
 Remaining       = Free to Spend − Expenses not created by Recurring Transactions
 Per day         = Remaining ÷ days left in the month
 ```
+
+Worked out from the month's Transactions and the Due Dates not yet created:
+
+- "Income recorded" is every Income Transaction dated in the month, recurring or not. "Recurring Income still due" is the month's Upcoming Income, at each Recurring Transaction's amount.
+- "Expenses scheduled by Recurring Transactions" are the Expenses already created by one, at their current amounts, plus the month's Upcoming Expenses. So confirming or editing flows through, and a deleted (skipped) one drops out.
+- Every figure counts Transactions dated later this month, as the slice 3 totals do.
 
 ## Architecture
 
@@ -259,6 +295,7 @@ Before inviting friends (slice 7):
 - Slice 2 tests: a new user has the starter sets, and a user with none gets them on first load; amounts outside the bounds or with too many decimal places are refused; dates outside the bounds (in the user's time zone) are refused; Day, Week and Month totals; a Transaction can't point at another user's Category (the API refuses it, and the database refuses it too); another user's Transaction or Category gives 404 for read, edit, delete and filter; the 61st write in a minute is refused; a request over 16 KB is refused.
 - Slice 3 tests: a month's Income and Expense totals and its Expenses by Category, in order, with Categories that have no Expenses left out; an archived Category with Expenses that month is listed; Transactions dated later this month count; the share rounding, including "<1%"; a malformed, missing or out-of-bounds `month` and any other parameter give 400; another user's Transactions never appear in the totals or the list.
 - Slice 4 tests: in `packages/shared`, how a limit carries forward (a change, a later change, a removal, a change to an earlier month), the per-day figure (rounding down, the last day of the month), and the bar's fill, Overspent included. Against the API: a month's limits come from the stored changes; editing November leaves October unchanged and reaches December; saving the same limit stores nothing; limits outside the bounds or with too many decimal places are refused; an archived, Income or other user's Category gives 404; a Category listed twice gives 400; a malformed, missing or out-of-bounds `month` and any other parameter give 400; a budgeted Category with no Expenses appears on the Dashboard; another user's Budgets never appear; the database refuses a Budget on another user's Category; the 61st write in a minute is refused.
+- Slice 5 tests: in `packages/shared`, Due Dates for each schedule (day 31, 29 Feb, weekdays, across years), the first Due Date from a start date, the next Due Date after a schedule change, the month's plan (Expected Income, Commitments, Free to Spend, Remaining), and the Budgets warning. Against the API: catching up creates each missed Due Date once, dated on it, and a deleted one is never recreated; two loads at once create each once; an Estimate is created when the amount varies and saving it confirms it; editing changes only later Transactions, and a schedule change never doubles a period; a stopped one creates nothing more and leaves Upcoming; the month's figures, Upcoming and the warning; the start date's bounds; the 101st is refused; another user's Recurring Transaction gives 404 for edit and stop, never appears, and the database refuses a Transaction linked to it.
 - API tests use a separate `for_wealth_test` database (`TEST_DATABASE_URL`), run one file at a time (`fileParallelism: false`) and empty the tables between tests. A test signs in by signing up, marking the email verified in the database, then signing in.
 - Slice 1 auth tests: no session gives 401, sign-in before verifying gives 403, a verified sign-in works, currency can't be changed, a breached or short password is rejected, a cross-site POST is rejected, the verification email is sent, a signed-out session's cookie gives 401, a session in use is extended, and two users each see only their own details. Password reset: an unknown email gets the same answer as a known one, a valid link resets the password and the new one signs in while the old one doesn't, a session from before the reset gets 401, a used, expired or earlier link is refused, a weak new password is refused, and a failure while saving the password changes nothing.
 
@@ -270,7 +307,7 @@ Each slice works all the way from the database to the screen.
 2. Categories (starter sets), adding and editing Transactions, the Transactions page with Day / Week / Month browsing. *You can use it every day from here.*
 3. Dashboard totals for Income and Expenses.
 4. Budgets (limits carry forward), progress bars, Overspent.
-5. Recurring Transactions, Estimates, Commitments, Expected Income, Free to Spend, Remaining, Upcoming, and the warning when Budgets add up to more than Free to Spend.
+5. Recurring Transactions, Estimates, Commitments, Expected Income, Free to Spend, Remaining, Upcoming, and the warning when Budgets don't fit Expected Income.
 6. Settings, delete account, Google sign-in, polish, phone layout.
 7. **First deploy**: hosting, managed Postgres, Resend, domain (optional), the "Before inviting friends" list under Hosting. **Then invite friends.**
 
