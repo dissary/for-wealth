@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { CurrencyCode } from './currency.js'
-import type { CalendarMonth } from './dates.js'
+import { type CalendarDate, type CalendarMonth, daysInMonth, monthOf } from './dates.js'
 import { amountInputSchema } from './money.js'
 import { amountSchema } from './transactions.js'
 
@@ -52,6 +52,18 @@ export type BudgetProgress = { fill: number } & (
 export function budgetProgress(spent: number, limit: number): BudgetProgress {
   const fill = Math.min(spent / limit, 1)
   return spent > limit ? { fill, overspent: true, by: spent - limit } : { fill, overspent: false, left: limit - spent }
+}
+
+// How much of a Budget's money left can still be spent each day: `left` minor
+// units ÷ the days left in the month, counting today in the user's time zone.
+// Rounded down to a whole minor unit, so it never shows more than is really
+// left. Only this month has one; null for a past or future month (v1-spec
+// "Budgets").
+export function budgetPerDay(left: number, month: CalendarMonth, today: CalendarDate): number | null {
+  if (monthOf(today) !== month) return null
+  const [year, monthNumber, day] = today.split('-').map(Number) as [number, number, number]
+  const daysLeft = daysInMonth(year, monthNumber) - day + 1
+  return Math.floor(left / daysLeft)
 }
 
 // A typed limit field: blank for no limit, otherwise read as a Transaction's
