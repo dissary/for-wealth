@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { budgetLimitsSchema, limitIn, limitInputSchema, MAX_AMOUNT, savingLimit } from '../src/index.js'
+import {
+  budgetLimitsSchema,
+  budgetProgress,
+  limitIn,
+  limitInputSchema,
+  MAX_AMOUNT,
+  savingLimit,
+} from '../src/index.js'
 
 describe('limitIn', () => {
   it('has no limit before any change', () => {
@@ -130,5 +137,25 @@ describe('budgetLimitsSchema', () => {
       { categoryId: FOOD, limit: 60_000 },
     ]
     expect(budgetLimitsSchema.safeParse({ limits }).success).toBe(false)
+  })
+})
+
+describe('budgetProgress', () => {
+  it('fills the bar to the share of the limit spent, with the rest left', () => {
+    expect(budgetProgress(8_000, 50_000)).toEqual({ fill: 0.16, overspent: false, left: 42_000 })
+  })
+
+  it('leaves the bar empty with nothing spent', () => {
+    expect(budgetProgress(0, 50_000)).toEqual({ fill: 0, overspent: false, left: 50_000 })
+  })
+
+  // v1-spec "Budgets": spending exactly the limit is not Overspent.
+  it('fills the bar with nothing left at exactly the limit', () => {
+    expect(budgetProgress(50_000, 50_000)).toEqual({ fill: 1, overspent: false, left: 0 })
+  })
+
+  it('is Overspent past the limit, by how much, with the bar no wider than full', () => {
+    expect(budgetProgress(54_000, 50_000)).toEqual({ fill: 1, overspent: true, by: 4_000 })
+    expect(budgetProgress(50_001, 50_000)).toEqual({ fill: 1, overspent: true, by: 1 })
   })
 })

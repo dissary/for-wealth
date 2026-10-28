@@ -9,6 +9,7 @@ import {
   NEW_USER,
   OTHER_USER,
   postTransaction,
+  putBudgets,
   signInNewUser,
   startFresh,
 } from './helpers.js'
@@ -32,10 +33,24 @@ async function add(cookie: string, categoryId: string | undefined, amount: numbe
   if (res.status !== 201) throw new Error(`Adding a Transaction failed: ${res.status}`)
 }
 
+// Sets limits from a month on, as the Edit Budgets dialog does.
+async function setBudgets(
+  cookie: string,
+  month: string,
+  limits: { categoryId: string | undefined; limit: number | null }[],
+) {
+  const res = await putBudgets(cookie, { month }, { limits })
+  if (res.status !== 204) throw new Error(`Saving Budgets failed: ${res.status}`)
+}
+
 type Dashboard = {
   month: string
   totals: { income: number; expense: number }
-  expenseCategories: { category: { id: string; name: string; archived: boolean }; total: number }[]
+  expenseCategories: {
+    category: { id: string; name: string; archived: boolean }
+    total: number
+    budget: number | null
+  }[]
 }
 
 // This month's Dashboard for the signed-in user.
@@ -72,10 +87,10 @@ describe('GET /api/dashboard', () => {
       totals: { income: 520_000, expense: 182_300 },
       // Categories with no Expenses this month are left out.
       expenseCategories: [
-        { category: { id: expense.Food, name: 'Food', archived: false }, total: 82_000 },
-        { category: { id: expense.Transport, name: 'Transport', archived: false }, total: 50_000 },
-        { category: { id: expense.Housing, name: 'Housing', archived: false }, total: 50_000 },
-        { category: { id: expense.Health, name: 'Health', archived: false }, total: 300 },
+        { category: { id: expense.Food, name: 'Food', archived: false }, total: 82_000, budget: null },
+        { category: { id: expense.Transport, name: 'Transport', archived: false }, total: 50_000, budget: null },
+        { category: { id: expense.Housing, name: 'Housing', archived: false }, total: 50_000, budget: null },
+        { category: { id: expense.Health, name: 'Health', archived: false }, total: 300, budget: null },
       ],
     })
   })
@@ -89,7 +104,7 @@ describe('GET /api/dashboard', () => {
     const body = await dashboardFor(cookie)
 
     expect(body.expenseCategories).toEqual([
-      { category: { id: expense.Food, name: 'Food', archived: true }, total: 1_250 },
+      { category: { id: expense.Food, name: 'Food', archived: true }, total: 1_250, budget: null },
     ])
   })
 
@@ -106,7 +121,7 @@ describe('GET /api/dashboard', () => {
 
     expect(body.totals).toEqual({ income: 500_000, expense: 1_250 })
     expect(body.expenseCategories).toEqual([
-      { category: { id: expense.Food, name: 'Food', archived: false }, total: 1_250 },
+      { category: { id: expense.Food, name: 'Food', archived: false }, total: 1_250, budget: null },
     ])
   })
 
@@ -120,6 +135,60 @@ describe('GET /api/dashboard', () => {
     const body = await dashboardFor(cookie)
 
     expect(body).toEqual({ month: MONTH, totals: { income: 0, expense: 0 }, expenseCategories: [] })
+  })
+})
+
+describe('GET /api/dashboard: Budgets', () => {
+  // Spent or not, a budgeted Category has a row; those with nothing spent
+  // come last, in position order.
+  it('lists each Category with a Budget, spent or not, with its limit', async () => {
+    const cookie = await signInNewUser()
+    const expense = await categoryIds(cookie, 'expense')
+    await add(cookie, expense.Food, 1_250)
+    await add(cookie, expense.Health, 300)
+    await setBudgets(cookie, MONTH, [
+      { categoryId: expense.Housing, limit: 100_000 },
+      { categoryId: expense.Food, limit: 50_000 },
+      { categoryId: expense.Transport, limit: 20_000 },
+    ])
+
+    const body = await dashboardFor(cookie)
+
+    expect(body.totals).toEqual({ income: 0, expense: 1_550 })
+    expect(body.expenseCategories).toEqual([
+      { category: { id: expense.Food, name: 'Food', archived: false }, total: 1_250, budget: 50_000 },
+      { category: { id: expense.Health, name: 'Health', archived: false }, total: 300, budget: null },
+      { category: { id: expense.Transport, name: 'Transport', archived: false }, total: 0, budget: 20_000 },
+      { category: { id: expense.Housing, name: 'Housing', archived: false }, total: 0, budget: 100_000 },
+    ])
+  })
+
+  it('takes a limit carried forward from an earlier month', async () => {
+    const cookie = await signInNewUser()
+    const expense = await categoryIds(cookie, 'expense')
+    await add(cookie, expense.Food, 1_250)
+    await setBudgets(cookie, addMonths(FIRST, -2).slice(0, 7), [
+      { categoryId: expense.Food, limit: 50_000 },
+      { categoryId: expense.Transport, limit: 20_000 },
+    ])
+
+    const body = await dashboardFor(cookie)
+
+    expect(body.expenseCategories).toEqual([
+      { category: { id: expense.Food, name: 'Food', archived: false }, total: 1_250, budget: 50_000 },
+      { category: { id: expense.Transport, name: 'Transport', archived: false }, total: 0, budget: 20_000 },
+    ])
+  })
+
+  it('leaves out a Category whose limit was removed', async () => {
+    const cookie = await signInNewUser()
+    const expense = await categoryIds(cookie, 'expense')
+    await setBudgets(cookie, addMonths(FIRST, -1).slice(0, 7), [{ categoryId: expense.Food, limit: 50_000 }])
+    await setBudgets(cookie, MONTH, [{ categoryId: expense.Food, limit: null }])
+
+    const body = await dashboardFor(cookie)
+
+    expect(body.expenseCategories).toEqual([])
   })
 })
 
@@ -179,7 +248,25 @@ describe('GET /api/dashboard: whose data', () => {
 
     expect(body.totals).toEqual({ income: 0, expense: 1_250 })
     expect(body.expenseCategories).toEqual([
-      { category: { id: herExpenses.Food, name: 'Food', archived: false }, total: 1_250 },
+      { category: { id: herExpenses.Food, name: 'Food', archived: false }, total: 1_250, budget: null },
+    ])
+  })
+
+  it('never shows another user’s Budgets', async () => {
+    const aisyah = await signInNewUser(NEW_USER)
+    const weiMing = await signInNewUser(OTHER_USER)
+    const herExpenses = await categoryIds(aisyah, 'expense')
+    const hisExpenses = await categoryIds(weiMing, 'expense')
+    await add(aisyah, herExpenses.Food, 1_250)
+    await setBudgets(weiMing, MONTH, [
+      { categoryId: hisExpenses.Food, limit: 50_000 },
+      { categoryId: hisExpenses.Transport, limit: 20_000 },
+    ])
+
+    const body = await dashboardFor(aisyah)
+
+    expect(body.expenseCategories).toEqual([
+      { category: { id: herExpenses.Food, name: 'Food', archived: false }, total: 1_250, budget: null },
     ])
   })
 
