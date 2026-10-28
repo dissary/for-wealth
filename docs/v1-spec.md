@@ -94,9 +94,10 @@ Decided on 2026-10-24, for slice 3. Slices 4 and 5 add Budgets, Free to Spend, R
 - Lives at `/`, so signing in without a `redirect` lands here. The header's links read Dashboard, then Transactions.
 - Shows one month: its Income total, its Expense total, and **Expenses by Category**. Income isn't broken down by Category.
 - No net figure, Free to Spend, Remaining or per-day figure until slice 5. Before Recurring Transactions exist, Remaining would be Income recorded minus Expenses, which is negative every month until the salary is recorded; in slice 5, Expected Income counts recurring Income still due, so the figures arrive together then.
-- **Expenses by Category**: one row per Expense Category with Expenses that month, showing its name, its total and its share of the month's Expenses ("Food RM820.00 · 34%"). Largest total first; equal totals fall back to the Category's position. Categories with no Expenses that month are left out. An archived Category with Expenses that month is listed as "Food (archived)".
+- **Expenses by Category**: one row per Expense Category with Expenses that month, showing its name, its total and its share of the month's Expenses ("Food RM820.00 · 34%"). Largest total first; equal totals fall back to the Category's position. Categories with no Expenses that month are left out (from slice 4, unless they have a Budget that month). An archived Category with Expenses that month is listed as "Food (archived)".
 - Shares are whole percentages. A share under 1% shows "<1%", never "0%". Rounded shares may not add up to 100%, and nothing adjusts them.
 - No bars in slice 3. In slice 4, each row gains its Budget limit and a progress bar, so a bar always means Budget progress.
+- From slice 4: a Category with a Budget that month has a row even with no Expenses, showing RM0.00 spent and no share. Budgeted rows show their Budget as set out under Budgets. Each entry in `expenseCategories` gains `budget` (the month's limit, or `null`), and a Category with a Budget but no Expenses comes back with `total: 0`. There is still no total of all Budgets beside the Income and Expense totals; that comes with Free to Spend in slice 5.
 - A row opens the Transactions page on that Month, filtered to that Category (`/transactions?period=month&date=2026-10-01&category=<id>`). The Income and Expense totals open that Month with no filter.
 - The month lives in the address bar (`/?month=2026-10`). ‹ › step one calendar month, and a "This month" button removes `month`. The bounds are the months holding 2000-01-01 and one year after today. An invalid or out-of-bounds `month` is dropped and the page shows this month. With no `month`, the page shows this month in the user's time zone and moves on at midnight on the 1st.
 - A month's totals count every Transaction dated in it, including ones dated later than today.
@@ -119,10 +120,26 @@ Decided on 2026-10-24, for slice 3. Slices 4 and 5 add Budgets, Free to Spend, R
 
 ### Budgets
 
-- Budgets are monthly only. Day and week views show a calculated figure (e.g. RM420 left ÷ 12 days = RM35/day).
-- A month with no Budgets of its own copies the previous month's limits. Editing November leaves October unchanged.
+- Budgets are monthly only. A month shows a per-day figure for what's left (e.g. RM420 left ÷ 12 days = RM35/day).
+- Each Category's limit carries forward to later months until it is changed or removed for that Category ([ADR 0007](adr/0007-budgets-stored-as-changes-per-category.md)). Editing November leaves October unchanged.
 - Unspent or overspent money **does not** carry over. Every month starts fresh.
-- If the Budgets add up to more than Free to Spend, show a warning. Don't block it.
+- If the Budgets add up to more than Free to Spend, show a warning. Don't block it. (Slice 5, once Free to Spend exists.)
+
+Decided on 2026-10-28, for slice 4.
+
+- **Stored as changes**: a Budget is a list of changes for one Expense Category, each saying "from this month, the limit is X" or "from this month, there is no limit". A month's limit is the latest change at or before it; nothing is stored per month. Editing a month changes it and every later month up to that Category's next change, and never an earlier month.
+- Any month the Dashboard can show can be edited, past ones included; like a refund, that changes how the month looks, because it is what was really planned. Saving the limit a month already has stores nothing. A Category has at most one change per month, so saving again replaces it. Whichever save comes last wins, with no conflict warning.
+- A new user has no Budgets. There is no starter set.
+- **Limit**: the same rules as a Transaction's amount: the same parser, 1 minor unit up to the same maximum, more decimal places than the currency has refused, never rounded. Zero is not allowed; a blank field means no limit.
+- **Overspent**: a Budget whose month's Expenses have gone past its limit. This is slice 4's warning, shown on the Category's row. Spending exactly the limit is not Overspent.
+- **Setting Budgets**: an Edit Budgets button on the Dashboard, always shown, opens a dialog (a sheet on a phone) titled with the month ("Budgets for October 2026"). It lists every Expense Category that isn't archived, in position order, each field starting on that month's limit, whether set that month or carried forward. Clearing a carried limit removes it from that month onwards. An invalid field says what's wrong in words, and nothing is saved until every field is valid. Saving closes the dialog and refreshes the Dashboard.
+- **Archived Categories**: no Budget is ever written for one in slice 4, as archiving arrives with Settings. What happens to an archived Category's Budget is slice 6's question.
+- **Per day**: on the Dashboard, for this month only, a budgeted row that isn't Overspent shows its money left ÷ the days left in the month, counting today, in the user's time zone. It rounds down to a whole minor unit, so it never shows more than is really left. Past and future months show no per-day figure. The Transactions page shows no Budget figures in slice 4; per-day figures there are on slice 6's polish list.
+- **Shown as**: a budgeted row shows its limit, a progress bar and where it stands in words: "RM420.00 left" in green, or "Overspent by RM40.00" in red. Exactly the limit reads "RM0.00 left", in green. The bar fills to the share of the limit spent, at most the whole width; an Overspent bar fills the whole width in red. A row without a Budget has no bar and no colour. There is no amber state, because only the two Budget tokens exist.
+- `GET /api/budgets?month=YYYY-MM` answers every Expense Category that isn't archived, in position order, with that month's limit: `[{ category: { id, name }, limit }]`, where `limit` is `null` for no limit. `month` follows the Dashboard's rules: required, and any other parameter, a malformed `month`, or one outside the bounds gives 400.
+- `PUT /api/budgets?month=YYYY-MM` takes `{ limits: [{ categoryId, limit }] }`, `limit` being a number or `null`, and applies each from that month onwards in one transaction. A Category that is another user's, archived, an Income Category, doesn't exist, or whose ID isn't an ID gives 404 `CATEGORY_NOT_FOUND`, the same as for adding a Transaction. The same Category listed twice gives 400. The per-user write limit applies.
+- Stored in a `budgets` table: `user_id`, `category_id`, the month the change starts from, and the limit (`bigint`, or null for no limit). Unique per user, Category and month. Its foreign key covers `(user_id, category_id)`, as a Transaction's does, so the database refuses a Budget on another user's Category.
+- Recurring Transactions and Estimates count towards Budgets from slice 5, because they are real Transactions; nothing in slice 4 needs to change for that.
 
 ### Recurring Transactions
 
@@ -241,6 +258,7 @@ Before inviting friends (slice 7):
 - API integration tests against a real Postgres, including **"user A cannot read or change user B's data"** for every endpoint that touches user data.
 - Slice 2 tests: a new user has the starter sets, and a user with none gets them on first load; amounts outside the bounds or with too many decimal places are refused; dates outside the bounds (in the user's time zone) are refused; Day, Week and Month totals; a Transaction can't point at another user's Category (the API refuses it, and the database refuses it too); another user's Transaction or Category gives 404 for read, edit, delete and filter; the 61st write in a minute is refused; a request over 16 KB is refused.
 - Slice 3 tests: a month's Income and Expense totals and its Expenses by Category, in order, with Categories that have no Expenses left out; an archived Category with Expenses that month is listed; Transactions dated later this month count; the share rounding, including "<1%"; a malformed, missing or out-of-bounds `month` and any other parameter give 400; another user's Transactions never appear in the totals or the list.
+- Slice 4 tests: in `packages/shared`, how a limit carries forward (a change, a later change, a removal, a change to an earlier month), the per-day figure (rounding down, the last day of the month), and the bar's fill, Overspent included. Against the API: a month's limits come from the stored changes; editing November leaves October unchanged and reaches December; saving the same limit stores nothing; limits outside the bounds or with too many decimal places are refused; an archived, Income or other user's Category gives 404; a Category listed twice gives 400; a malformed, missing or out-of-bounds `month` and any other parameter give 400; a budgeted Category with no Expenses appears on the Dashboard; another user's Budgets never appear; the database refuses a Budget on another user's Category; the 61st write in a minute is refused.
 - API tests use a separate `for_wealth_test` database (`TEST_DATABASE_URL`), run one file at a time (`fileParallelism: false`) and empty the tables between tests. A test signs in by signing up, marking the email verified in the database, then signing in.
 - Slice 1 auth tests: no session gives 401, sign-in before verifying gives 403, a verified sign-in works, currency can't be changed, a breached or short password is rejected, a cross-site POST is rejected, the verification email is sent, a signed-out session's cookie gives 401, a session in use is extended, and two users each see only their own details. Password reset: an unknown email gets the same answer as a known one, a valid link resets the password and the new one signs in while the old one doesn't, a session from before the reset gets 401, a used, expired or earlier link is refused, a weak new password is refused, and a failure while saving the password changes nothing.
 
@@ -251,8 +269,8 @@ Each slice works all the way from the database to the screen.
 1. Monorepo, API skeleton, Postgres, Better Auth (email + password, verification, password reset), login screen. Runs locally only.
 2. Categories (starter sets), adding and editing Transactions, the Transactions page with Day / Week / Month browsing. *You can use it every day from here.*
 3. Dashboard totals for Income and Expenses.
-4. Budgets (limits carry forward), progress bars, over-Budget warning.
-5. Recurring Transactions, Estimates, Commitments, Expected Income, Free to Spend, Remaining, Upcoming.
+4. Budgets (limits carry forward), progress bars, Overspent.
+5. Recurring Transactions, Estimates, Commitments, Expected Income, Free to Spend, Remaining, Upcoming, and the warning when Budgets add up to more than Free to Spend.
 6. Settings, delete account, Google sign-in, polish, phone layout.
 7. **First deploy**: hosting, managed Postgres, Resend, domain (optional), the "Before inviting friends" list under Hosting. **Then invite friends.**
 

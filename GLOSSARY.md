@@ -33,8 +33,12 @@ _Avoid_: Tag, type, bucket
 ### Planning
 
 **Budget**:
-A spending limit for one Expense Category for one month. The limit carries forward to later months until changed; unspent or overspent money does not.
+A spending limit for one Expense Category for one month. Each Category's limit carries forward to later months until it is changed or removed for that Category; unspent or overspent money does not.
 _Avoid_: Plan, envelope, cap
+
+**Overspent**:
+A Budget whose month's Expenses in its Category have gone past its limit.
+_Avoid_: Over the limit, blown, in the red
 
 **Commitment**:
 The total of a month's Expenses that are already scheduled by Recurring Transactions.
