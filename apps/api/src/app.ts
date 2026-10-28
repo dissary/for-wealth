@@ -4,6 +4,7 @@ import { csrf } from 'hono/csrf'
 import { secureHeaders } from 'hono/secure-headers'
 import { auth } from './auth.js'
 import { env } from './env.js'
+import { budgets } from './routes/budgets.js'
 import { categories } from './routes/categories.js'
 import { dashboard } from './routes/dashboard.js'
 import { health } from './routes/health.js'
@@ -39,6 +40,7 @@ const app = new Hono()
   .route('/categories', categories)
   .route('/transactions', transactions)
   .route('/dashboard', dashboard)
+  .route('/budgets', budgets)
 
 export type AppType = typeof app
 export default app

@@ -31,6 +31,7 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { api } from '@/lib/api'
 import { categoriesQuery } from '@/lib/categories'
 import { type Transaction, TRANSACTIONS_KEY } from '@/lib/transactions'
+import { isTooManyWrites, TOO_MANY_WRITES } from '@/lib/write-limit'
 
 // In the switch's order: Expense first, as most Transactions are one.
 const KIND_LABELS: Record<CategoryKind, string> = { expense: 'Expense', income: 'Income' }
@@ -315,11 +316,4 @@ function DeleteTransaction({ id, onDeleted }: { id: string; onDeleted: () => voi
       <FieldError>{error}</FieldError>
     </div>
   )
-}
-
-const TOO_MANY_WRITES = 'That’s a lot of changes in one minute. Wait a moment, then try again.'
-
-// From the write limit, a middleware, so the RPC types don't list it.
-function isTooManyWrites(res: Response) {
-  return res.status === 429
 }

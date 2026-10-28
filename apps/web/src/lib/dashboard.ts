@@ -9,13 +9,16 @@ async function fetchMonth(month: CalendarMonth) {
   return res.json()
 }
 
+// Every month's Dashboard, under the Transactions it is summed from.
+export const DASHBOARD_KEY = [...TRANSACTIONS_KEY, 'dashboard'] as const
+
 // One month's Income and Expense totals and its Expenses by Category. They're
 // summed from the Transactions, so the key starts with theirs, and adding,
 // editing or deleting one refreshes the Dashboard too. Stepping to the next
 // month keeps the last one on screen until the new one arrives.
 export function dashboardQuery(month: CalendarMonth) {
   return queryOptions({
-    queryKey: [...TRANSACTIONS_KEY, 'dashboard', month],
+    queryKey: [...DASHBOARD_KEY, month],
     queryFn: () => fetchMonth(month),
     placeholderData: keepPreviousData,
   })
