@@ -2,7 +2,7 @@
 
 Track, plan and understand your spending, day by day, week by week, month by month.
 
-**Status:** early. You can create an account and verify your email; signing in comes next. Features arrive slice by slice, in the build order in [docs/v1-spec.md](docs/v1-spec.md).
+**Status:** slices 1–5 of the build order in [docs/v1-spec.md](docs/v1-spec.md) are built. You can sign up, record Income and Expenses, browse them by Day, Week and Month, set Budgets, and add Recurring Transactions, and the Dashboard shows the month's Remaining, Free to Spend and what's still to come. Next is slice 6: Settings, deleting an account, Google sign-in and the phone layout. It runs locally only until slice 7.
 
 ## Layout
 
