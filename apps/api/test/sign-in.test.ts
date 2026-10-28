@@ -2,6 +2,7 @@ import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { db, pool } from '../src/db/client.js'
 import { sessions, users } from '../src/db/schema/index.js'
+import { passwordHashing } from '../src/password-hashing.js'
 import {
   APP_ORIGIN,
   cookiesFrom,
@@ -31,6 +32,18 @@ describe('signing in', () => {
     const res = await getMe(cookie)
 
     expect(res.status).toBe(200)
+  })
+
+  // Every other test hashes passwords fast (test/fast-passwords.ts); this one
+  // runs the scrypt hash production uses.
+  it('checks the password with the real hash', async () => {
+    passwordHashing.reset()
+    const cookie = await signInNewUser()
+
+    const wrongPassword = await signIn({ email: NEW_USER.email, password: 'not the right one' })
+
+    expect((await getMe(cookie)).status).toBe(200)
+    expect(wrongPassword.status).toBe(401)
   })
 
   it('gives the same answer for a wrong password and for an email with no account', async () => {

@@ -13,6 +13,7 @@ import { db } from './db/client.js'
 import * as schema from './db/schema/auth.js'
 import { sendInBackground } from './email.js'
 import { env } from './env.js'
+import { passwordHashing } from './password-hashing.js'
 import { resetTokenStorage, spendResetTokens } from './reset-tokens.js'
 import { userRules } from './user-rules.js'
 
@@ -46,6 +47,11 @@ export const auth = betterAuth({
     enabled: true,
     minPasswordLength: PASSWORD_MIN_LENGTH,
     maxPasswordLength: PASSWORD_MAX_LENGTH,
+    // Looked up on each call, so tests can swap the hash.
+    password: {
+      hash: (password) => passwordHashing.hash(password),
+      verify: (data) => passwordHashing.verify(data),
+    },
     // Also makes sign-up answer the same way whether or not the email
     // already has an account.
     requireEmailVerification: true,
