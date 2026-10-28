@@ -28,7 +28,7 @@ export default defineConfig({
       BETTER_AUTH_URL: 'http://localhost:5173',
     },
     globalSetup: ['./test/global-setup.ts'],
-    setupFiles: ['./test/no-network.ts'],
+    setupFiles: ['./test/no-network.ts', './test/fast-passwords.ts'],
     // The tests share one database, so test files run one at a time.
     fileParallelism: false,
   },
