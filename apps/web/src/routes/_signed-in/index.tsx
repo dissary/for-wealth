@@ -14,9 +14,10 @@ import {
 } from '@for-wealth/shared'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link, redirect } from '@tanstack/react-router'
-import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from 'lucide-react'
+import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, TargetIcon } from 'lucide-react'
 import { useState } from 'react'
 import { z } from 'zod'
+import { BudgetsDialog } from '@/components/budgets-dialog'
 import { Total } from '@/components/total'
 import { TransactionDialog } from '@/components/transaction-dialog'
 import { Button } from '@/components/ui/button'
@@ -57,6 +58,7 @@ function DashboardPage() {
   const bounds = { earliest: EARLIEST_DATE, latest: addYears(today, 1) }
   const [adding, setAdding] = useState(false)
   const add = () => setAdding(true)
+  const [editingBudgets, setEditingBudgets] = useState(false)
 
   return (
     <main className="flex flex-col gap-8 py-8 sm:gap-10 sm:py-12">
@@ -85,10 +87,18 @@ function DashboardPage() {
               </Button>
             )}
           </nav>
-          <Button size="lg" onClick={add}>
-            <PlusIcon aria-hidden="true" />
-            Add Transaction
-          </Button>
+          {/* Always shown, so Budgets can be set before a month has any
+              Expenses. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="lg" variant="outline" onClick={() => setEditingBudgets(true)}>
+              <TargetIcon aria-hidden="true" />
+              Edit Budgets
+            </Button>
+            <Button size="lg" onClick={add}>
+              <PlusIcon aria-hidden="true" />
+              Add Transaction
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -120,6 +130,8 @@ function DashboardPage() {
         // Today, whichever month is shown (v1-spec "The Dashboard").
         defaultDate={today}
       />
+      {/* The month shown, past and future ones included. */}
+      <BudgetsDialog open={editingBudgets} onOpenChange={setEditingBudgets} month={month} currency={me.currency} />
     </main>
   )
 }

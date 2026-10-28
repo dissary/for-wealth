@@ -18,6 +18,7 @@ import {
   updateTransaction,
 } from '../transactions.js'
 import { limitWrites } from '../write-limit.js'
+import { categoryNotFound } from './shared.js'
 
 // A Day, a Week or a Month, named by any date in it, and optionally one
 // Category; nothing else, so no arbitrary ranges. Today, and so the bounds on
@@ -28,13 +29,6 @@ function periodQuerySchema(timeZone: string) {
     date: transactionDateSchema(timeZone),
     category: categoryIdSchema.optional(),
   })
-}
-
-// Someone else's Category, an archived one to add to or move to, and one
-// that doesn't exist all get this same answer, so nobody can probe for other
-// users' IDs.
-function categoryNotFound(c: Context) {
-  return c.json({ code: 'CATEGORY_NOT_FOUND' as const, message: 'That Category isn’t available' }, 404)
 }
 
 // Someone else's Transaction and one that doesn't exist get this same answer.

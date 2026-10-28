@@ -148,3 +148,20 @@ export function getDashboard(cookie: string | undefined, query: Record<string, s
     headers: cookie ? { cookie } : {},
   })
 }
+
+// One month's Budgets, for a query such as { month: '2026-10' }.
+export function getBudgets(cookie: string | undefined, query: Record<string, string>) {
+  return app.request(`/api/budgets?${new URLSearchParams(query)}`, {
+    headers: cookie ? { cookie } : {},
+  })
+}
+
+// Sets Budgets from a month on, for a query such as { month: '2026-10' } and
+// a body such as { limits: [{ categoryId, limit: 50000 }] }.
+export function putBudgets(cookie: string | undefined, query: Record<string, string>, body: unknown) {
+  return app.request(`/api/budgets?${new URLSearchParams(query)}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', origin: APP_ORIGIN, ...(cookie ? { cookie } : {}) },
+    body: JSON.stringify(body),
+  })
+}
