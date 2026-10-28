@@ -1,5 +1,6 @@
 import {
   addYears,
+  budgetProgress,
   type CalendarMonth,
   type CurrencyCode,
   dashboardMonthSchema,
@@ -210,28 +211,28 @@ function MonthView({
             </Button>
           </div>
         ) : (
-          // Already in display order: largest total first. Columns are shared
-          // through subgrid, so every row's amount and share line up. Slice 4
-          // adds a column for the Budget limit and, under each row, a
-          // full-width row for its bar; no bars before then, as a bar always
-          // means Budget progress.
+          // Already in display order: largest total first, then budgeted
+          // Categories with nothing spent. Columns are shared through
+          // subgrid, so every row's amount, limit and share line up.
           <ul aria-labelledby="expenses-by-category" className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4 divide-y">
-            {expenseCategories.map(({ category, total }) => (
+            {expenseCategories.map(({ category, total, budget }) => (
               <li key={category.id} className="col-span-full grid grid-cols-subgrid">
                 {/* The hover and focus outline reach past the text on both
                     sides, so the text stays in line with the heading. */}
                 <Link
                   to="/transactions"
                   search={{ ...monthView, category: category.id }}
-                  className="relative isolate col-span-full grid grid-cols-subgrid items-baseline py-3.5 outline-none before:absolute before:inset-y-0 before:-inset-x-2 before:-z-10 before:rounded-md before:transition-colors hover:before:bg-muted focus-visible:before:ring-3 focus-visible:before:ring-ring/50"
+                  className="relative isolate col-span-full grid grid-cols-subgrid items-baseline gap-y-2 py-3.5 outline-none before:absolute before:inset-y-0 before:-inset-x-2 before:-z-10 before:rounded-md before:transition-colors hover:before:bg-muted focus-visible:before:ring-3 focus-visible:before:ring-ring/50"
                 >
                   <span className="min-w-0 font-medium">
                     {category.archived ? `${category.name} (archived)` : category.name}
                   </span>
                   <span className="text-right font-medium tabular-nums">{formatAmount(total, currency)}</span>
+                  {/* A budgeted Category with nothing spent has no share. */}
                   <span className="w-10 text-right text-sm text-muted-foreground tabular-nums">
-                    {formatShare(total, totals.expense)}
+                    {total > 0 && formatShare(total, totals.expense)}
                   </span>
+                  {budget !== null && <BudgetStanding spent={total} limit={budget} currency={currency} />}
                 </Link>
               </li>
             ))}
@@ -239,5 +240,35 @@ function MonthView({
         )}
       </section>
     </div>
+  )
+}
+
+// A budgeted row's bar and where it stands in words, under its name and
+// amount; the limit sits under the amount spent, so the two read as one
+// figure. Green while there's money left, red once Overspent, and only for
+// a Budget: a row without one has no bar and no colour (v1-spec "Budgets").
+function BudgetStanding({ spent, limit, currency }: { spent: number; limit: number; currency: CurrencyCode }) {
+  const progress = budgetProgress(spent, limit)
+  return (
+    <>
+      {/* The words say what the bar shows, so screen readers skip it. */}
+      <div aria-hidden="true" className="col-span-2 col-start-1 h-1.5 overflow-hidden rounded-full bg-border">
+        <div
+          className={cn('h-full rounded-full', progress.overspent ? 'bg-over-budget' : 'bg-under-budget')}
+          style={{ width: `${progress.fill * 100}%` }}
+        />
+      </div>
+      <span
+        className={cn(
+          'col-start-1 text-sm font-medium tabular-nums',
+          progress.overspent ? 'text-over-budget' : 'text-under-budget',
+        )}
+      >
+        {progress.overspent
+          ? `Overspent by ${formatAmount(progress.by, currency)}`
+          : `${formatAmount(progress.left, currency)} left`}
+      </span>
+      <span className="text-right text-sm text-muted-foreground tabular-nums">of {formatAmount(limit, currency)}</span>
+    </>
   )
 }

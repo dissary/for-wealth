@@ -38,6 +38,22 @@ export function savingLimit(
   return hasOwn && limitIn(earlier, month) === limit ? 'drop' : 'store'
 }
 
+// How far through a Budget a month is: the bar's fill, from 0 to 1, and the
+// money left or how much it's Overspent by, in minor units.
+export type BudgetProgress = { fill: number } & (
+  | { overspent: false; left: number }
+  | { overspent: true; by: number }
+)
+
+// Where a month's Budget stands, given its Category's Expenses that month,
+// both in minor units. The bar fills to the share of the limit spent and
+// never past it. Spending exactly the limit leaves 0 and isn't Overspent
+// (v1-spec "Budgets").
+export function budgetProgress(spent: number, limit: number): BudgetProgress {
+  const fill = Math.min(spent / limit, 1)
+  return spent > limit ? { fill, overspent: true, by: spent - limit } : { fill, overspent: false, left: limit - spent }
+}
+
 // A typed limit field: blank for no limit, otherwise read as a Transaction's
 // amount is, with the currency's own decimal places, never rounded, and zero
 // refused (v1-spec "Budgets").
