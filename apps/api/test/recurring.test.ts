@@ -501,6 +501,9 @@ describe('POST /api/recurring/:id/stop', () => {
   })
 })
 
+// The maths is tested in packages/shared (monthFigures). These check what the
+// queries feed it: Recurring Transactions, Budgets, and which Transactions
+// Recurring Transactions created.
 describe('the Dashboard’s plan', () => {
   it('counts Upcoming Due Dates in a future month, and warns when Budgets don’t fit', async () => {
     const cookie = await signInNewUser()
@@ -551,16 +554,6 @@ describe('the Dashboard’s plan', () => {
 
     await putBudgets(cookie, { month: NEXT_MONTH }, { limits: [{ categoryId: Food, limit: 400_000 }] })
     expect((await dashboardFor(cookie, NEXT_MONTH)).budgetsOverBy).toBe(50_000)
-
-    // Rent under a budgeted Housing is covered by that Budget, so it isn't
-    // counted twice.
-    await putBudgets(cookie, { month: NEXT_MONTH }, {
-      limits: [
-        { categoryId: Food, limit: 300_000 },
-        { categoryId: Housing, limit: 200_000 },
-      ],
-    })
-    expect((await dashboardFor(cookie, NEXT_MONTH)).budgetsOverBy).toBeNull()
   })
 
   it('counts a created Commitment at its amount, not as Upcoming', async () => {
@@ -605,17 +598,6 @@ describe('the Dashboard’s plan', () => {
       expectedIncome: 150_000,
       commitments: 150_000,
     })
-  })
-
-  it('has nothing Upcoming in a past month', async () => {
-    const cookie = await signInNewUser()
-    const { Salary } = await categoryIds(cookie, 'income')
-    await added(cookie, { categoryId: Salary, amount: 500_000, schedule: ON_TODAYS_WEEKDAY })
-
-    const body = await dashboardFor(cookie, LAST_MONTH)
-
-    expect(body.upcoming).toEqual([])
-    expect(body.plan.expectedIncome).toBe(0)
   })
 })
 
