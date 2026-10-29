@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { budgetsOverBy, formatAmount, formatShare, monthPlan, perDayLeft } from '../src/index.js'
+import {
+  type ActiveRecurringTransaction,
+  budgetsOverBy,
+  type CalendarDate,
+  type CalendarMonth,
+  type CategoryKind,
+  type CategoryMonth,
+  formatAmount,
+  formatShare,
+  monthFigures,
+  perDayLeft,
+  type Schedule,
+} from '../src/index.js'
 
 describe('formatShare', () => {
   it('is a whole percentage of the month’s Expenses', () => {
@@ -73,44 +85,253 @@ describe('perDayLeft', () => {
   })
 })
 
-describe('monthPlan', () => {
-  // v1-spec "Dashboard maths", with RM5,000 salary recorded, a RM1,000 bonus
-  // still due, RM1,500 rent and RM200 internet created by Recurring
-  // Transactions, RM150 electricity still due, and RM800 of other Expenses.
+describe('monthFigures', () => {
+  // A Category named for its ID: "food" is Food.
+  function newCategory(id: string, kind: CategoryKind, position: number, archived = false) {
+    return { id, name: id[0]!.toUpperCase() + id.slice(1), kind, archived, position }
+  }
+  type TestCategory = ReturnType<typeof newCategory>
+
+  // What was recorded under a Category in the month: its total, and the part
+  // Recurring Transactions created.
+  function recorded(category: TestCategory, total: number, fromRecurring = 0): CategoryMonth {
+    return { category, total, fromRecurring }
+  }
+
+  function recurringIn(
+    category: TestCategory,
+    { id, amount, schedule, nextDueDate, varies = false }: {
+      id: string
+      amount: number
+      schedule: Schedule
+      nextDueDate: CalendarDate
+      varies?: boolean
+    },
+  ): ActiveRecurringTransaction {
+    const { id: categoryId, name, kind, archived } = category
+    return { id, amount, schedule, nextDueDate, varies, note: null, category: { id: categoryId, name, kind, archived } }
+  }
+
+  const salary = newCategory('salary', 'income', 0)
+  const bonus = newCategory('bonus', 'income', 1)
+  const food = newCategory('food', 'expense', 0)
+  const transport = newCategory('transport', 'expense', 1)
+  const housing = newCategory('housing', 'expense', 2)
+  const utilities = newCategory('utilities', 'expense', 3)
+  const bills = newCategory('bills', 'expense', 4)
+
+  // v1-spec "Dashboard maths", with RM5,000 salary and RM1,500 rent and
+  // RM200 internet already created by Recurring Transactions, a RM1,000
+  // bonus and RM150 electricity still due, and RM800 of other Expenses.
   it('works out Expected Income, Commitments, Free to Spend and Remaining', () => {
-    const plan = monthPlan({
-      recorded: { income: 500_000, expense: 250_000 },
-      fromRecurring: { income: 500_000, expense: 170_000 },
-      upcoming: { income: 100_000, expense: 15_000 },
+    const figures = monthFigures({
+      month: '2026-11',
+      categories: [
+        recorded(salary, 500_000, 500_000),
+        recorded(housing, 150_000, 150_000),
+        recorded(bills, 20_000, 20_000),
+        recorded(food, 80_000),
+      ],
+      recurring: [
+        // Created on the 1st, so its next is in December: nothing Upcoming.
+        recurringIn(salary, {
+          id: 'pay',
+          amount: 500_000,
+          schedule: { frequency: 'monthly', day: 1 },
+          nextDueDate: '2026-12-01',
+        }),
+        recurringIn(bonus, {
+          id: 'bonus',
+          amount: 100_000,
+          schedule: { frequency: 'monthly', day: 28 },
+          nextDueDate: '2026-11-28',
+        }),
+        recurringIn(utilities, {
+          id: 'electricity',
+          amount: 15_000,
+          schedule: { frequency: 'monthly', day: 20 },
+          nextDueDate: '2026-11-20',
+        }),
+      ],
+      budgets: [],
     })
 
-    expect(plan).toEqual({
+    expect(figures.totals).toEqual({ income: 500_000, expense: 250_000 })
+    expect(figures.plan).toEqual({
       expectedIncome: 600_000,
       commitments: 185_000,
       freeToSpend: 415_000,
       remaining: 335_000,
     })
-  })
-
-  // Before the salary is recorded, Expected Income still counts it.
-  it('counts recurring Income still due before any is recorded', () => {
-    const plan = monthPlan({
-      recorded: { income: 0, expense: 1_250 },
-      fromRecurring: { income: 0, expense: 0 },
-      upcoming: { income: 500_000, expense: 150_000 },
-    })
-
-    expect(plan).toEqual({ expectedIncome: 500_000, commitments: 150_000, freeToSpend: 350_000, remaining: 348_750 })
+    // Created and Upcoming alike, Expense Categories only.
+    expect(figures.commitmentsByCategory).toEqual({ housing: 150_000, bills: 20_000, utilities: 15_000 })
   })
 
   it('goes below zero when spending passes Free to Spend', () => {
-    const plan = monthPlan({
-      recorded: { income: 100_000, expense: 124_000 },
-      fromRecurring: { income: 0, expense: 0 },
-      upcoming: { income: 0, expense: 0 },
+    const figures = monthFigures({
+      month: '2026-11',
+      categories: [recorded(salary, 100_000), recorded(food, 124_000)],
+      recurring: [],
+      budgets: [],
     })
 
-    expect(plan.remaining).toBe(-24_000)
+    expect(figures.plan.remaining).toBe(-24_000)
+  })
+
+  describe('Upcoming', () => {
+    const recurring = [
+      recurringIn(housing, {
+        id: 'rent',
+        amount: 150_000,
+        schedule: { frequency: 'monthly', day: 25 },
+        nextDueDate: '2026-11-25',
+      }),
+      recurringIn(food, {
+        id: 'groceries',
+        amount: 20_000,
+        schedule: { frequency: 'weekly', weekday: 1 },
+        nextDueDate: '2026-11-09',
+        varies: true,
+      }),
+    ]
+
+    function upcomingIn(month: CalendarMonth) {
+      return monthFigures({ month, categories: [], recurring, budgets: [] }).upcoming.map(
+        ({ recurringTransactionId, dueDate }) => [recurringTransactionId, dueDate],
+      )
+    }
+
+    // 2 Nov is a Monday, but already created: the next is 9 Nov.
+    it('holds the rest of this month, from each one’s next Due Date, in date order', () => {
+      expect(upcomingIn('2026-11')).toEqual([
+        ['groceries', '2026-11-09'],
+        ['groceries', '2026-11-16'],
+        ['groceries', '2026-11-23'],
+        ['rent', '2026-11-25'],
+        ['groceries', '2026-11-30'],
+      ])
+    })
+
+    it('holds every Due Date of a future month', () => {
+      expect(upcomingIn('2026-12')).toEqual([
+        ['groceries', '2026-12-07'],
+        ['groceries', '2026-12-14'],
+        ['groceries', '2026-12-21'],
+        ['rent', '2026-12-25'],
+        ['groceries', '2026-12-28'],
+      ])
+    })
+
+    it('is empty for a past month', () => {
+      expect(upcomingIn('2026-10')).toEqual([])
+    })
+
+    it('counts each Due Date at its Recurring Transaction’s amount, marking Estimates', () => {
+      const figures = monthFigures({ month: '2026-12', categories: [], recurring, budgets: [] })
+
+      expect(figures.upcoming[0]).toEqual({
+        recurringTransactionId: 'groceries',
+        dueDate: '2026-12-07',
+        amount: 20_000,
+        estimate: true,
+        note: null,
+        category: { id: 'food', name: 'Food', kind: 'expense', archived: false },
+      })
+      expect(figures.plan.commitments).toBe(4 * 20_000 + 150_000)
+      expect(figures.commitmentsByCategory).toEqual({ food: 80_000, housing: 150_000 })
+    })
+
+    // Before the salary is recorded, Expected Income still counts it.
+    it('counts recurring Income still due towards Expected Income', () => {
+      const figures = monthFigures({
+        month: '2026-12',
+        categories: [recorded(food, 1_250)],
+        recurring: [
+          recurringIn(salary, {
+            id: 'pay',
+            amount: 500_000,
+            schedule: { frequency: 'monthly', day: 25 },
+            nextDueDate: '2026-11-25',
+          }),
+          recurringIn(housing, {
+            id: 'rent',
+            amount: 150_000,
+            schedule: { frequency: 'monthly', day: 1 },
+            nextDueDate: '2026-12-01',
+          }),
+        ],
+        budgets: [],
+      })
+
+      expect(figures.plan).toEqual({
+        expectedIncome: 500_000,
+        commitments: 150_000,
+        freeToSpend: 350_000,
+        remaining: 348_750,
+      })
+    })
+  })
+
+  describe('Expenses by Category', () => {
+    const health = newCategory('health', 'expense', 6, true)
+    const shopping = newCategory('shopping', 'expense', 5)
+    const family = newCategory('family', 'expense', 8)
+
+    it('lists the largest first, then by position, then budgeted ones with nothing spent', () => {
+      const figures = monthFigures({
+        month: '2026-11',
+        categories: [
+          recorded(health, 30_000),
+          recorded(salary, 500_000),
+          recorded(food, 30_000),
+          recorded(transport, 50_000),
+        ],
+        recurring: [],
+        // In position order, as monthBudgets gives them.
+        budgets: [
+          { category: food, limit: 40_000 },
+          { category: transport, limit: null },
+          { category: utilities, limit: 10_000 },
+          { category: shopping, limit: null },
+          { category: family, limit: 5_000 },
+        ],
+      })
+
+      expect(figures.expenseCategories).toEqual([
+        { category: { id: 'transport', name: 'Transport', archived: false }, total: 50_000, budget: null },
+        { category: { id: 'food', name: 'Food', archived: false }, total: 30_000, budget: 40_000 },
+        // Archived, but it has Expenses that month.
+        { category: { id: 'health', name: 'Health', archived: true }, total: 30_000, budget: null },
+        { category: { id: 'utilities', name: 'Utilities', archived: false }, total: 0, budget: 10_000 },
+        { category: { id: 'family', name: 'Family', archived: false }, total: 0, budget: 5_000 },
+      ])
+    })
+
+    // Positions aren't unique, so equal totals at the same position fall back
+    // to the Category's ID, whichever order they come in.
+    it('orders equal totals at the same position by ID', () => {
+      const pets = newCategory('pets', 'expense', 7)
+      const gifts = newCategory('gifts', 'expense', 7)
+      const figures = monthFigures({
+        month: '2026-11',
+        categories: [recorded(pets, 10_000), recorded(gifts, 10_000)],
+        recurring: [],
+        budgets: [],
+      })
+
+      expect(figures.expenseCategories.map(({ category }) => category.id)).toEqual(['gifts', 'pets'])
+    })
+
+    it('warns when Budgets and Commitments go past Expected Income', () => {
+      const figures = monthFigures({
+        month: '2026-11',
+        categories: [recorded(salary, 200_000), recorded(housing, 150_000, 150_000)],
+        recurring: [],
+        budgets: [{ category: food, limit: 100_000 }],
+      })
+
+      expect(figures.budgetsOverBy).toBe(50_000)
+    })
   })
 })
 

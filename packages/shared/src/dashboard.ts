@@ -1,6 +1,8 @@
 import { z } from 'zod'
-import { type CalendarDate, type CalendarMonth, daysInMonth, isCalendarMonth, monthOf } from './dates.js'
-import { formatPeriodLabel } from './periods.js'
+import type { CategoryKind } from './categories.js'
+import { type CalendarDate, type CalendarMonth, daysInMonth, firstDayOf, isCalendarMonth, monthOf } from './dates.js'
+import { formatPeriodLabel, periodRange } from './periods.js'
+import { dueDatesBetween, type Schedule } from './recurring.js'
 import { EARLIEST_DATE, latestDate } from './transactions.js'
 
 // The month the Dashboard shows, for a user in `timeZone`. Its bounds are the
@@ -46,28 +48,128 @@ export function perDayLeft(left: number, month: CalendarMonth, today: CalendarDa
 }
 
 // A month's Income and Expenses, in minor units.
-export interface KindTotals {
-  income: number
-  expense: number
+type KindTotals = Record<CategoryKind, number>
+
+// For sorting strings that compare with < and >: calendar dates, and IDs in
+// the order Postgres gives them.
+function byText(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0
 }
 
-// A month's plan (v1-spec "Dashboard maths"), from its Transactions,
-// `recorded`, the part of those a Recurring Transaction created, and its
-// Upcoming Due Dates, at their Recurring Transactions' amounts.
-export function monthPlan({
-  recorded,
-  fromRecurring,
-  upcoming,
+// One Category's Transactions dated in the month: their total, and the part
+// of it Recurring Transactions created, at their current amounts, both in
+// minor units.
+export interface CategoryMonth {
+  category: { id: string; name: string; kind: CategoryKind; archived: boolean; position: number }
+  total: number
+  fromRecurring: number
+}
+
+// A Recurring Transaction that isn't stopped, with its next Due Date, the
+// first not yet created.
+export interface ActiveRecurringTransaction {
+  id: string
+  nextDueDate: CalendarDate
+  amount: number
+  schedule: Schedule
+  varies: boolean
+  note: string | null
+  category: { id: string; name: string; kind: CategoryKind; archived: boolean }
+}
+
+// A month's Dashboard figures (v1-spec "Dashboard maths" and "The Dashboard
+// in slice 5"), from its Transactions summed per Category (`categories`,
+// Categories with none left out), the Recurring Transactions that aren't
+// stopped, and the month's Budgets, in position order. Every Due Date from
+// each one's next on is Upcoming, so they must have caught up first.
+export function monthFigures({
+  month,
+  categories,
+  recurring,
+  budgets,
 }: {
-  recorded: KindTotals
-  fromRecurring: KindTotals
-  upcoming: KindTotals
+  month: CalendarMonth
+  categories: readonly CategoryMonth[]
+  recurring: readonly ActiveRecurringTransaction[]
+  budgets: readonly { category: { id: string; name: string }; limit: number | null }[]
 }) {
-  const expectedIncome = recorded.income + upcoming.income
-  const commitments = fromRecurring.expense + upcoming.expense
+  const { from, to } = periodRange('month', firstDayOf(month))
+
+  // Each kind's total is the sum of its Categories' totals. The kind comes
+  // from the Category (ADR 0005).
+  const totals: KindTotals = { income: 0, expense: 0 }
+  const recurringTotals: KindTotals = { income: 0, expense: 0 }
+  // Expense Category ID to its Commitments: created and Upcoming alike.
+  const commitmentsByCategory: Record<string, number> = {}
+  for (const { category, total, fromRecurring } of categories) {
+    totals[category.kind] += total
+    recurringTotals[category.kind] += fromRecurring
+    if (category.kind === 'expense' && fromRecurring > 0) commitmentsByCategory[category.id] = fromRecurring
+  }
+
+  // The month's Due Dates not yet created, in date order, at each Recurring
+  // Transaction's amount. None for a past month: everything due is created.
+  const upcoming = recurring
+    .flatMap(({ id, nextDueDate, amount, schedule, varies, note, category }) =>
+      dueDatesBetween(schedule, nextDueDate > from ? nextDueDate : from, to).map((dueDate) => ({
+        recurringTransactionId: id,
+        dueDate,
+        amount,
+        estimate: varies,
+        note,
+        category,
+      })),
+    )
+    .sort((a, b) => byText(a.dueDate, b.dueDate))
+  const upcomingTotals: KindTotals = { income: 0, expense: 0 }
+  for (const { amount, category } of upcoming) {
+    upcomingTotals[category.kind] += amount
+    if (category.kind === 'expense') {
+      commitmentsByCategory[category.id] = (commitmentsByCategory[category.id] ?? 0) + amount
+    }
+  }
+
+  const expectedIncome = totals.income + upcomingTotals.income
+  const commitments = recurringTotals.expense + upcomingTotals.expense
   const freeToSpend = expectedIncome - commitments
-  const remaining = freeToSpend - (recorded.expense - fromRecurring.expense)
-  return { expectedIncome, commitments, freeToSpend, remaining }
+  const remaining = freeToSpend - (totals.expense - recurringTotals.expense)
+
+  // Largest total first; equal totals fall back to the Category's position.
+  // An archived Category with Expenses that month is still listed. A
+  // Category with a Budget has a row even with no Expenses that month: those
+  // total 0, so they come last, in position order. Only Categories that
+  // aren't archived have Budgets in slice 4.
+  const limits = new Map(budgets.map(({ category, limit }) => [category.id, limit]))
+  const spentRows = categories
+    .filter(({ category }) => category.kind === 'expense')
+    .sort(
+      (a, b) =>
+        b.total - a.total ||
+        a.category.position - b.category.position ||
+        byText(a.category.id, b.category.id),
+    )
+    .map(({ category: { id, name, archived }, total }) => ({
+      category: { id, name, archived },
+      total,
+      budget: limits.get(id) ?? null,
+    }))
+  const spentIds = new Set(spentRows.map((row) => row.category.id))
+  const unspentRows = budgets
+    .filter(({ category, limit }) => limit !== null && !spentIds.has(category.id))
+    .map(({ category: { id, name }, limit }) => ({ category: { id, name, archived: false }, total: 0, budget: limit }))
+
+  return {
+    totals,
+    plan: { expectedIncome, commitments, freeToSpend, remaining },
+    commitmentsByCategory,
+    budgetsOverBy: budgetsOverBy({
+      limits: budgets.map(({ category, limit }) => ({ categoryId: category.id, limit })),
+      commitmentsByCategory,
+      expectedIncome,
+    }),
+    expenseCategories: [...spentRows, ...unspentRows],
+    upcoming,
+  }
 }
 
 // How far a month's Budgets, plus its Commitments in Expense Categories
