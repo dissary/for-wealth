@@ -6,6 +6,7 @@ import { LocateFixedIcon } from 'lucide-react'
 import { type ReactNode, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
+import { CategorySettings } from '@/components/category-settings'
 import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -44,7 +45,7 @@ function SettingsPage() {
         </p>
       </Section>
       <Section id="categories" title="Categories">
-        <p className="text-sm text-muted-foreground">Adding, renaming and archiving Categories is coming soon.</p>
+        <CategorySettings />
       </Section>
     </main>
   )

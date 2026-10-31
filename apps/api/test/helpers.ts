@@ -192,3 +192,28 @@ export function stopRecurring(cookie: string | undefined, id: string) {
     headers: { origin: APP_ORIGIN, ...(cookie ? { cookie } : {}) },
   })
 }
+
+export function postCategory(cookie: string | undefined, body: unknown) {
+  return app.request('/api/categories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: APP_ORIGIN, ...(cookie ? { cookie } : {}) },
+    body: JSON.stringify(body),
+  })
+}
+
+export function patchCategory(cookie: string | undefined, id: string, body: unknown) {
+  return app.request(`/api/categories/${id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', origin: APP_ORIGIN, ...(cookie ? { cookie } : {}) },
+    body: JSON.stringify(body),
+  })
+}
+
+// Moves a Category, for a body such as { direction: 'up' }.
+export function moveCategory(cookie: string | undefined, id: string, body: unknown) {
+  return app.request(`/api/categories/${id}/move`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: APP_ORIGIN, ...(cookie ? { cookie } : {}) },
+    body: JSON.stringify(body),
+  })
+}

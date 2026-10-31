@@ -1,6 +1,6 @@
 import { CATEGORY_KINDS } from '@for-wealth/shared'
 import { sql } from 'drizzle-orm'
-import { boolean, integer, pgEnum, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
+import { boolean, integer, pgEnum, pgTable, text, timestamp, unique, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 import { users } from './auth.js'
 
 export const categoryKind = pgEnum('category_kind', CATEGORY_KINDS)
@@ -26,8 +26,14 @@ export const categories = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  // Lets a Transaction's foreign key cover (user_id, category_id), so the
-  // database refuses a Transaction filed under another user's Category. It
-  // also serves every lookup by user.
-  (table) => [unique('categories_user_id_id_unique').on(table.userId, table.id)],
+  (table) => [
+    // Lets a Transaction's foreign key cover (user_id, category_id), so the
+    // database refuses a Transaction filed under another user's Category. It
+    // also serves every lookup by user.
+    unique('categories_user_id_id_unique').on(table.userId, table.id),
+    // A name is used once per kind, ignoring case, archived Categories
+    // included, even when two saves come at the same moment. The API answers
+    // a clash from this refusal.
+    uniqueIndex('categories_user_id_kind_name_unique').on(table.userId, table.kind, sql`lower(${table.name})`),
+  ],
 )
