@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
-import { ChevronDownIcon, LogOutIcon } from 'lucide-react'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { ChevronDownIcon, LogOutIcon, SettingsIcon } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,10 +12,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { authClient } from '@/lib/auth-client'
-import { currencyLabel } from '@/lib/currency'
 import type { Me } from '@/lib/me'
 
-// The user's name in the header, opening their details and Sign out.
+// The user's name in the header, opening who is signed in, Settings and
+// Sign out.
 export function UserMenu({ me }: { me: Me }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -45,17 +45,17 @@ export function UserMenu({ me }: { me: Me }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-72">
-          <DropdownMenuLabel asChild>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 font-normal">
-              <dt className="text-muted-foreground">Email</dt>
-              <dd className="truncate">{me.email}</dd>
-              <dt className="text-muted-foreground">Currency</dt>
-              <dd>{currencyLabel(me.currency)}</dd>
-              <dt className="text-muted-foreground">Time zone</dt>
-              <dd>{me.timeZone}</dd>
-            </dl>
+          <DropdownMenuLabel className="flex flex-col gap-0.5 font-normal">
+            <span className="truncate font-medium">{me.name}</span>
+            <span className="truncate text-muted-foreground">{me.email}</span>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link to="/settings">
+              <SettingsIcon aria-hidden="true" />
+              Settings
+            </Link>
+          </DropdownMenuItem>
           <DropdownMenuItem onSelect={signOut} disabled={state === 'signing-out'}>
             <LogOutIcon aria-hidden="true" />
             {state === 'signing-out' ? 'Signing out…' : 'Sign out'}
