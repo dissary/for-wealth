@@ -31,7 +31,7 @@ A Transaction created by a Recurring Transaction whose amount may vary, holding 
 _Avoid_: Draft, pending, placeholder
 
 **Category**:
-A label that groups Transactions by purpose, such as Food, Transport, or Rent. A Category that is no longer wanted is archived, never deleted, so past Transactions keep it. Every Category is either an Income Category or an Expense Category.
+A label that groups Transactions by purpose, such as Food, Transport, or Rent. A Category that is no longer wanted is archived, never deleted, so past Transactions keep it; an archived Category can be restored. Every Category is either an Income Category or an Expense Category.
 _Avoid_: Tag, type, bucket
 
 ### Planning
