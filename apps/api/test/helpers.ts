@@ -217,3 +217,17 @@ export function moveCategory(cookie: string | undefined, id: string, body: unkno
     body: JSON.stringify(body),
   })
 }
+
+export function archiveCategory(cookie: string | undefined, id: string) {
+  return app.request(`/api/categories/${id}/archive`, {
+    method: 'POST',
+    headers: { origin: APP_ORIGIN, ...(cookie ? { cookie } : {}) },
+  })
+}
+
+export function restoreCategory(cookie: string | undefined, id: string) {
+  return app.request(`/api/categories/${id}/restore`, {
+    method: 'POST',
+    headers: { origin: APP_ORIGIN, ...(cookie ? { cookie } : {}) },
+  })
+}

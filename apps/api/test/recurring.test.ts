@@ -605,7 +605,13 @@ describe('another user’s Recurring Transactions', () => {
   it('never appear, and give 404 for edit and stop', async () => {
     const theirs = await signInNewUser(OTHER_USER)
     const { Food: theirFood } = await categoryIds(theirs, 'expense')
-    const id = await added(theirs, { categoryId: theirFood, amount: 2_000, schedule: ON_TODAYS_WEEKDAY })
+    // Tokyo is an hour ahead, so their today can be after TODAY.
+    const id = await added(theirs, {
+      categoryId: theirFood,
+      amount: 2_000,
+      schedule: ON_TODAYS_WEEKDAY,
+      startDate: todayIn(OTHER_USER.timeZone),
+    })
     const cookie = await signInNewUser()
 
     expect(await listing(cookie)).toEqual({ active: [], stopped: [] })

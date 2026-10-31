@@ -26,12 +26,14 @@ export async function createTransaction(userId: string, input: NewTransaction) {
 
 // Whether new Transactions, or Recurring Transactions, can go under this
 // Category: it must be one of the user's and not archived, as archived ones
-// are hidden from pickers.
-export async function canFileUnder(userId: string, categoryId: string) {
-  const [category] = await db
+// are hidden from pickers. Inside a transaction, the Category stays as it is
+// until that transaction ends: archiving it waits, then sees what was saved.
+export async function canFileUnder(userId: string, categoryId: string, tx: Pick<typeof db, 'select'> = db) {
+  const [category] = await tx
     .select({ id: categories.id })
     .from(categories)
     .where(and(eq(categories.userId, userId), eq(categories.id, categoryId), eq(categories.archived, false)))
+    .for('share')
   return !!category
 }
 

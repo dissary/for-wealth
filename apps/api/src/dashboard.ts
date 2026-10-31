@@ -1,6 +1,6 @@
 import { type CalendarMonth, firstDayOf, monthFigures, periodRange } from '@for-wealth/shared'
 import { and, between, eq, sql } from 'drizzle-orm'
-import { monthBudgets } from './budgets.js'
+import { monthBudgetsWithArchived } from './budgets.js'
 import { db } from './db/client.js'
 import { categories, transactions } from './db/schema/index.js'
 import { dueThrough } from './recurring.js'
@@ -41,7 +41,7 @@ export async function monthDashboard(userId: string, month: CalendarMonth) {
     .groupBy(categories.id)
   const [rows, budgets, recurring, estimates] = await Promise.all([
     categoryMonths,
-    monthBudgets(userId, month),
+    monthBudgetsWithArchived(userId, month),
     dueThrough(userId, to),
     listEstimates(userId),
   ])

@@ -307,6 +307,21 @@ describe('monthFigures', () => {
       ])
     })
 
+    // A Budget kept from before the Category was archived (v1-spec "Budgets").
+    it('marks a budgeted row with nothing spent as archived when its Category is', () => {
+      const figures = monthFigures({
+        month: '2026-09',
+        categories: [],
+        recurring: [],
+        budgets: [{ category: health, limit: 20_000 }],
+      })
+
+      expect(figures.expenseCategories).toEqual([
+        { category: { id: 'health', name: 'Health', archived: true }, total: 0, budget: 20_000 },
+      ])
+      expect(figures.budgetsOverBy).toBe(20_000)
+    })
+
     // Positions aren't unique, so equal totals at the same position fall back
     // to the Category's ID, whichever order they come in.
     it('orders equal totals at the same position by ID', () => {

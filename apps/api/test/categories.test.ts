@@ -1,23 +1,31 @@
+import { addMonths, firstDayOf, monthOf, todayIn } from '@for-wealth/shared'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db, pool } from '../src/db/client.js'
 import { type listCategories, writeStarterCategories } from '../src/categories.js'
-import { categories, users } from '../src/db/schema/index.js'
+import { budgets, categories, transactions, users } from '../src/db/schema/index.js'
 import { responseFloor } from '../src/response-floor.js'
 import { writeLimit } from '../src/write-limit.js'
 import {
+  archiveCategory,
   cookiesFrom,
+  getBudgets,
   getCategories,
+  getDashboard,
   getMe,
   moveCategory,
   NEW_USER,
   OTHER_USER,
   patchCategory,
   postCategory,
+  postRecurring,
+  putBudgets,
+  restoreCategory,
   signIn,
   signInNewUser,
   signUp,
   startFresh,
+  stopRecurring,
 } from './helpers.js'
 
 const INCOME = ['Salary', 'Bonus', 'Side income', 'Other']
@@ -482,10 +490,312 @@ describe('POST /api/categories/:id/move', () => {
   })
 })
 
+// This month in the user's zone (Kuala Lumpur), and the months around it.
+const MONTH = monthOf(todayIn(NEW_USER.timeZone))
+const LAST_MONTH = monthOf(addMonths(firstDayOf(MONTH), -1))
+const NEXT_MONTH = monthOf(addMonths(firstDayOf(MONTH), 1))
+
+async function userIdOf(cookie: string) {
+  return ((await (await getMe(cookie)).json()) as { id: string }).id
+}
+
+async function addRecurring(cookie: string, body: Record<string, unknown>) {
+  const res = await postRecurring(cookie, { varies: false, startDate: firstDayOf(NEXT_MONTH), ...body })
+  if (res.status !== 201) throw new Error(`Adding a Recurring Transaction failed: ${res.status}`)
+  return ((await res.json()) as { id: string }).id
+}
+
+// Sets one Category's limit from a month on, as Edit Budgets does.
+async function setBudget(cookie: string, month: string, categoryId: string, limit: number | null) {
+  const res = await putBudgets(cookie, { month }, { limits: [{ categoryId, limit }] })
+  if (res.status !== 204) throw new Error(`Saving a Budget failed: ${res.status}`)
+}
+
+async function dashboardFor(cookie: string, month: string) {
+  const res = await getDashboard(cookie, { month })
+  if (res.status !== 200) throw new Error(`Loading the Dashboard failed: ${res.status}`)
+  return (await res.json()) as {
+    expenseCategories: {
+      category: { id: string; name: string; archived: boolean }
+      total: number
+      budget: number | null
+    }[]
+    budgetsOverBy: number | null
+  }
+}
+
+describe('POST /api/categories/:id/archive', () => {
+  it('moves a Category to the archived list, and again when repeated', async () => {
+    const cookie = await signInNewUser()
+    const id = await idOf(cookie, 'expense', 'Health')
+
+    const first = await archiveCategory(cookie, id)
+    const again = await archiveCategory(cookie, id)
+
+    expect([first.status, again.status]).toEqual([204, 204])
+    const listed = await categoriesFor(cookie)
+    expect(listed.expense.map((c) => c.name)).toEqual(EXPENSE.filter((name) => name !== 'Health'))
+    expect(listed.archived.expense).toEqual([{ id, name: 'Health', kind: 'expense' }])
+  })
+
+  it('refuses the last Category of a kind that isn’t archived', async () => {
+    const cookie = await signInNewUser()
+    for (const name of ['Salary', 'Bonus', 'Side income']) {
+      expect((await archiveCategory(cookie, await idOf(cookie, 'income', name))).status).toBe(204)
+    }
+
+    const res = await archiveCategory(cookie, await idOf(cookie, 'income', 'Other'))
+
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({
+      code: 'LAST_CATEGORY',
+      message: 'This is your last Income Category. Add another before archiving it.',
+    })
+    expect((await namesFor(cookie)).income).toEqual(['Other'])
+  })
+
+  it('counts only the same kind for the last Category', async () => {
+    const cookie = await signInNewUser()
+    for (const name of ['Salary', 'Bonus', 'Side income']) {
+      await archiveCategory(cookie, await idOf(cookie, 'income', name))
+    }
+
+    const res = await archiveCategory(cookie, await idOf(cookie, 'expense', 'Other'))
+
+    expect(res.status).toBe(204)
+  })
+
+  it('refuses while a Recurring Transaction that isn’t stopped uses it, naming them', async () => {
+    const cookie = await signInNewUser()
+    const food = await idOf(cookie, 'expense', 'Food')
+    const schedule = { frequency: 'monthly', day: 28 }
+    const lunch = await addRecurring(cookie, { categoryId: food, amount: 4_500, note: 'Lunch', schedule })
+    const transport = await idOf(cookie, 'expense', 'Transport')
+    await addRecurring(cookie, { categoryId: transport, amount: 9_000, note: null, schedule })
+
+    const res = await archiveCategory(cookie, food)
+
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({
+      code: 'CATEGORY_HAS_RECURRING',
+      message: 'Recurring Transactions use this Category. Move them to another Category or stop them first.',
+      recurring: [{ id: lunch, amount: 4_500, note: 'Lunch', schedule }],
+    })
+    expect((await namesFor(cookie)).expense).toEqual(EXPENSE)
+  })
+
+  it('isn’t blocked by a stopped Recurring Transaction', async () => {
+    const cookie = await signInNewUser()
+    const food = await idOf(cookie, 'expense', 'Food')
+    const lunch = await addRecurring(cookie, {
+      categoryId: food,
+      amount: 4_500,
+      note: null,
+      schedule: { frequency: 'monthly', day: 28 },
+    })
+    await stopRecurring(cookie, lunch)
+
+    const res = await archiveCategory(cookie, food)
+
+    expect(res.status).toBe(204)
+  })
+
+  // Several rounds, as a race without the lock doesn't show every time.
+  it('never leaves a Recurring Transaction under it when one is added at the same moment', async () => {
+    const cookie = await signInNewUser()
+
+    for (let round = 1; round <= 5; round++) {
+      const created = await postCategory(cookie, { name: `Round ${round}`, kind: 'expense' })
+      const { id } = (await created.json()) as { id: string }
+
+      const [archived, added] = await Promise.all([
+        archiveCategory(cookie, id),
+        postRecurring(cookie, {
+          categoryId: id,
+          amount: 4_500,
+          note: null,
+          varies: false,
+          schedule: { frequency: 'monthly', day: 28 },
+          startDate: firstDayOf(NEXT_MONTH),
+        }),
+      ])
+
+      expect([[204, 404], [409, 201]], `round ${round}`).toContainEqual([archived.status, added.status])
+    }
+  })
+
+  describe('its Budget', () => {
+    // 1am on 1 November in Kuala Lumpur, still October in UTC.
+    it('ends from this month in the user’s time zone', async () => {
+      vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-31T17:00:00Z') })
+      try {
+        const cookie = await signInNewUser()
+        const food = await idOf(cookie, 'expense', 'Food')
+        await setBudget(cookie, '2026-10', food, 80_000)
+
+        await archiveCategory(cookie, food)
+
+        expect((await dashboardFor(cookie, '2026-10')).expenseCategories).toEqual([
+          { category: { id: food, name: 'Food', archived: true }, total: 0, budget: 80_000 },
+        ])
+        expect((await dashboardFor(cookie, '2026-11')).expenseCategories).toEqual([])
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('ends from this month, removing later changes, and earlier months keep their limits', async () => {
+      const cookie = await signInNewUser()
+      const food = await idOf(cookie, 'expense', 'Food')
+      await setBudget(cookie, LAST_MONTH, food, 80_000)
+      await setBudget(cookie, NEXT_MONTH, food, 90_000)
+
+      expect((await archiveCategory(cookie, food)).status).toBe(204)
+
+      // Last month's row is still there, archived, and counts towards the
+      // warning, as nothing was earned.
+      const last = await dashboardFor(cookie, LAST_MONTH)
+      expect(last.expenseCategories).toEqual([
+        { category: { id: food, name: 'Food', archived: true }, total: 0, budget: 80_000 },
+      ])
+      expect(last.budgetsOverBy).toBe(80_000)
+      for (const month of [MONTH, NEXT_MONTH]) {
+        const shown = await dashboardFor(cookie, month)
+        expect(shown.expenseCategories, month).toEqual([])
+        expect(shown.budgetsOverBy, month).toBeNull()
+      }
+    })
+
+    it('shows an earlier month’s archived row with what was spent against it', async () => {
+      const cookie = await signInNewUser()
+      const food = await idOf(cookie, 'expense', 'Food')
+      await setBudget(cookie, LAST_MONTH, food, 10_000)
+      await db.insert(transactions).values({
+        userId: await userIdOf(cookie),
+        categoryId: food,
+        amount: 12_000,
+        date: `${LAST_MONTH}-15`,
+      })
+
+      await archiveCategory(cookie, food)
+
+      expect((await dashboardFor(cookie, LAST_MONTH)).expenseCategories).toEqual([
+        { category: { id: food, name: 'Food', archived: true }, total: 12_000, budget: 10_000 },
+      ])
+    })
+
+    it('stores nothing when this month has no limit already', async () => {
+      const cookie = await signInNewUser()
+      const food = await idOf(cookie, 'expense', 'Food')
+
+      await archiveCategory(cookie, food)
+
+      expect(await db.$count(budgets)).toBe(0)
+    })
+
+    it('is never listed in Edit Budgets again, and can’t be given a limit', async () => {
+      const cookie = await signInNewUser()
+      const food = await idOf(cookie, 'expense', 'Food')
+      await setBudget(cookie, MONTH, food, 80_000)
+      await archiveCategory(cookie, food)
+
+      const listed = (await (await getBudgets(cookie, { month: LAST_MONTH })).json()) as { category: { id: string } }[]
+      const put = await putBudgets(cookie, { month: NEXT_MONTH }, { limits: [{ categoryId: food, limit: 5_000 }] })
+
+      expect(listed.map((b) => b.category.id)).not.toContain(food)
+      expect(put.status).toBe(404)
+      expect(await put.json()).toMatchObject({ code: 'CATEGORY_NOT_FOUND' })
+    })
+  })
+})
+
+describe('POST /api/categories/:id/restore', () => {
+  it('puts an archived Category back, last in its kind, and again when repeated', async () => {
+    const cookie = await signInNewUser()
+    const food = await idOf(cookie, 'expense', 'Food')
+    await archiveCategory(cookie, food)
+
+    const first = await restoreCategory(cookie, food)
+    const again = await restoreCategory(cookie, food)
+
+    expect([first.status, again.status]).toEqual([204, 204])
+    const listed = await categoriesFor(cookie)
+    expect(listed.expense.map((c) => c.name)).toEqual([...EXPENSE.filter((name) => name !== 'Food'), 'Food'])
+    expect(listed.archived.expense).toEqual([])
+  })
+
+  it('leaves a Category that isn’t archived where it is', async () => {
+    const cookie = await signInNewUser()
+
+    const res = await restoreCategory(cookie, await idOf(cookie, 'expense', 'Food'))
+
+    expect(res.status).toBe(204)
+    expect(await namesFor(cookie)).toEqual({ income: INCOME, expense: EXPENSE })
+  })
+
+  it('brings no Budget back', async () => {
+    const cookie = await signInNewUser()
+    const food = await idOf(cookie, 'expense', 'Food')
+    await setBudget(cookie, MONTH, food, 80_000)
+    await archiveCategory(cookie, food)
+
+    await restoreCategory(cookie, food)
+
+    const listed = (await (await getBudgets(cookie, { month: MONTH })).json()) as {
+      category: { id: string }
+      limit: number | null
+    }[]
+    expect(listed.find((b) => b.category.id === food)?.limit).toBeNull()
+  })
+
+  it('can be renamed and moved again once restored', async () => {
+    const cookie = await signInNewUser()
+    const food = await idOf(cookie, 'expense', 'Food')
+    await archiveCategory(cookie, food)
+    await restoreCategory(cookie, food)
+
+    const renamed = await patchCategory(cookie, food, { name: 'Groceries' })
+    const moved = await moveCategory(cookie, food, { direction: 'up' })
+
+    expect([renamed.status, moved.status]).toEqual([200, 204])
+    expect((await namesFor(cookie)).expense.slice(-2)).toEqual(['Groceries', 'Other'])
+  })
+
+  it('gives 404 for another user’s archived Category and leaves it archived', async () => {
+    const cookie = await signInNewUser()
+    const other = await signInNewUser(OTHER_USER)
+    const theirs = await idOf(other, 'expense', 'Food')
+    await archiveCategory(other, theirs)
+
+    const res = await restoreCategory(cookie, theirs)
+
+    expect(res.status).toBe(404)
+    expect((await categoriesFor(other)).archived.expense.map((c) => c.name)).toEqual(['Food'])
+  })
+
+  it('refuses the 51st Category of a kind that isn’t archived', async () => {
+    const cookie = await signInNewUser()
+    const food = await idOf(cookie, 'expense', 'Food')
+    await archiveCategory(cookie, food)
+    await addExpenseCategories(cookie, 50 - (EXPENSE.length - 1))
+
+    const res = await restoreCategory(cookie, food)
+
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({
+      code: 'CATEGORY_LIMIT',
+      message: 'You can have up to 50 Expense Categories.',
+    })
+    expect((await categoriesFor(cookie)).archived.expense.map((c) => c.name)).toEqual(['Food'])
+  })
+})
+
 describe('every Category write', () => {
   const writes = {
     rename: (cookie: string | undefined, id: string) => patchCategory(cookie, id, { name: 'Medical' }),
     move: (cookie: string | undefined, id: string) => moveCategory(cookie, id, { direction: 'up' }),
+    archive: archiveCategory,
+    restore: restoreCategory,
   }
 
   it.each(Object.entries(writes))('%s gives 404 for another user’s Category and leaves it alone', async (_, write) => {
@@ -522,6 +832,8 @@ describe('every Category write', () => {
     ['add', (cookie: string | undefined) => postCategory(cookie, { name: 'Pets', kind: 'expense' })],
     ['rename', (cookie: string | undefined) => writes.rename(cookie, '00000000-0000-4000-8000-000000000000')],
     ['move', (cookie: string | undefined) => writes.move(cookie, '00000000-0000-4000-8000-000000000000')],
+    ['archive', (cookie: string | undefined) => writes.archive(cookie, '00000000-0000-4000-8000-000000000000')],
+    ['restore', (cookie: string | undefined) => writes.restore(cookie, '00000000-0000-4000-8000-000000000000')],
   ])('%s gives 401 with no session', async (_, write) => {
     const res = await write(undefined)
 
@@ -539,9 +851,11 @@ describe('every Category write', () => {
       postCategory(cookie, { name: 'Pets', kind: 'expense' }),
       patchCategory(cookie, bonus, { name: 'Commission' }),
       moveCategory(cookie, bonus, { direction: 'down' }),
+      archiveCategory(cookie, bonus),
+      restoreCategory(cookie, bonus),
     ])
 
-    expect(answers.map((res) => res.status)).toEqual([429, 429, 429])
+    expect(answers.map((res) => res.status)).toEqual([429, 429, 429, 429, 429])
     expect(await namesFor(cookie)).toEqual({ income: INCOME, expense: EXPENSE })
   }, 20_000)
 })
