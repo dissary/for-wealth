@@ -15,7 +15,8 @@ The author is the first user. Once the foundation works, it goes to friends and 
 - Monthly **Budgets** per Expense Category, with progress bars.
 - **Recurring Transactions** (monthly, weekly, yearly) that create real Transactions on their due dates. Variable bills create an **Estimate** to confirm later.
 - Dashboard: this month's **Expected Income**, Expenses, **Commitments**, **Free to Spend**, **Remaining** (and per-day for the rest of the month), Budget progress, upcoming recurring items, Estimates to confirm.
-- Settings: Categories, currency (chosen at signup, shown read-only), time zone, delete account and all data.
+- Settings: Categories, currency (chosen at signup, shown read-only), time zone.
+- Delete your account and all its data (slice 7, before inviting friends).
 - Desktop-first layout that also works in a phone browser.
 
 ### Deliberately not in v1
@@ -31,6 +32,7 @@ The author is the first user. Once the foundation works, it goes to friends and 
 | Multiple currencies | later |
 | Week start setting (weeks start on Monday in v1) | later setting |
 | Two-factor sign-in | later |
+| Google sign-in (dropped from slice 6 on 2026-10-31) | later |
 | Bank syncing (Plaid and similar) | not planned |
 | Envelope / zero-based budgeting | not planned |
 | Subcategories, tags, merchant field, attachments | add only if needed |
@@ -211,7 +213,7 @@ for-wealth/
 | API framework | Hono |
 | Database | PostgreSQL, via Drizzle ORM |
 | Validation | Zod (shared by API and forms) |
-| Auth | Better Auth: email + password (Google sign-in in slice 6), cookie sessions, email verification required |
+| Auth | Better Auth: email + password, cookie sessions, email verification required |
 | Email | Resend |
 | Web → API calls | Hono RPC typed client |
 | Styling / components | Tailwind CSS + shadcn/ui, with a custom theme (not the defaults) |
@@ -256,7 +258,6 @@ The app runs on the author's machines until it's ready for friends. No domain or
 - The database is a Neon dev project, shared by every machine. It holds a `for_wealth` database for development, plus `for_wealth_test` on a machine that runs the tests locally (CI always runs them on its own Postgres). Which database production uses is decided at launch.
 - `pnpm dev` runs the web app and the API side by side. Vite proxies `/api/*` to the API, so the browser sees one address, just like production.
 - Emails (verification, password reset) are printed to the API console instead of being sent. Resend is wired in only for production.
-- Google sign-in is added in slice 6 and works locally with a `localhost` redirect URL. Slice 1 is email and password only.
 
 ### Hosting (at launch)
 
@@ -264,6 +265,7 @@ One service at one address: the API serves the built web app, and data lives und
 
 Before inviting friends (slice 7):
 
+- Delete account, in Settings: after a confirmation step, removes the user and all their data in one delete (see Data and security).
 - Rate-limit counters (Better Auth's and the per-user write limit) are stored in the database, not in memory, so they survive restarts.
 - The client IP used for rate limiting is read from the host's proxy header, configured so it can't be faked.
 - Migrations run as a separate database role. The app's role can read and write data but can't change the schema.
@@ -284,7 +286,7 @@ Before inviting friends (slice 7):
 - Signup and password reset never reveal whether an email has an account.
 - All `/api/*` routes, not just Better Auth's, reject state-changing requests from other sites (Hono's `csrf()` middleware), as a second layer on top of `SameSite=Lax` cookies.
 - Security headers on every response (Hono's `secureHeaders()`).
-- Google sign-in (slice 6) must not join a Google login onto an email + password account whose email was never verified. Otherwise, someone could register a victim's email with their own password before the victim ever signs in with Google. Check this in Better Auth's account-linking behaviour and cover it with a test. Google sign-ups must also confirm currency and time zone once before using the app, instead of silently getting MYR and UTC. `users.time_zone` is `NOT NULL` with no default (slice 1), so the Google sign-up has to supply one when the user is created, or creating the user fails.
+- Google sign-in is not in v1. If it is added later, it must not join a Google login onto an email + password account whose email was never verified. Otherwise, someone could register a victim's email with their own password before the victim ever signs in with Google. Check this in Better Auth's account-linking behaviour and cover it with a test. Google sign-ups must also confirm currency and time zone once before using the app, instead of silently getting MYR and UTC. `users.time_zone` is `NOT NULL` with no default (slice 1), so the Google sign-up has to supply one when the user is created, or creating the user fails.
 - Supply chain: the pnpm lockfile is committed. pnpm's `minimumReleaseAge` is set to 3 days, so package versions published only hours ago aren't installed. Packages can't run install scripts unless they're explicitly allowed.
 - Keep Better Auth updated.
 
@@ -308,8 +310,8 @@ Each slice works all the way from the database to the screen.
 3. Dashboard totals for Income and Expenses.
 4. Budgets (limits carry forward), progress bars, Overspent.
 5. Recurring Transactions, Estimates, Commitments, Expected Income, Free to Spend, Remaining, Upcoming, and the warning when Budgets don't fit Expected Income.
-6. Settings, delete account, Google sign-in, polish, phone layout.
-7. **First deploy**: hosting, managed Postgres, Resend, domain (optional), the "Before inviting friends" list under Hosting. **Then invite friends.**
+6. Settings, polish, phone layout.
+7. **First deploy**: hosting, managed Postgres, Resend, domain (optional), the "Before inviting friends" list under Hosting, delete account included. **Then invite friends.**
 
 ## Design
 
