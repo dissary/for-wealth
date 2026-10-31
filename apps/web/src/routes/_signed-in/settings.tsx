@@ -1,4 +1,4 @@
-import { nameSchema, timeZoneSchema } from '@for-wealth/shared'
+import { nameSchema, PASSWORD_MIN_LENGTH, passwordSchema, timeZoneSchema } from '@for-wealth/shared'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
@@ -8,7 +8,7 @@ import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import { CategorySettings } from '@/components/category-settings'
 import { Button } from '@/components/ui/button'
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { type AuthErrorCode, authClient } from '@/lib/auth-client'
 import { currencyLabel } from '@/lib/currency'
@@ -33,7 +33,7 @@ function SettingsPage() {
         <ProfileForm me={me} />
       </Section>
       <Section id="password" title="Password">
-        <p className="text-sm text-muted-foreground">Changing your password is coming soon.</p>
+        <PasswordForm />
       </Section>
       <Section id="time-zone" title="Time zone">
         <TimeZoneForm savedZone={me.timeZone} />
@@ -121,6 +121,105 @@ function ProfileForm({ me }: { me: Me }) {
           {saved && !isDirty && (
             <p role="status" className="text-sm text-muted-foreground">
               Saved.
+            </p>
+          )}
+        </div>
+      </FieldGroup>
+    </form>
+  )
+}
+
+const passwordFormSchema = z.object({
+  currentPassword: z.string().min(1, 'Enter your current password'),
+  newPassword: passwordSchema,
+})
+
+const NEW_PASSWORD_ERRORS: AuthErrorCode[] = ['PASSWORD_TOO_SHORT', 'PASSWORD_TOO_LONG', 'PASSWORD_COMPROMISED']
+
+// The new password follows the sign-up rules, breach check included. Better
+// Auth signs every other session out and gives this one a new cookie, so the
+// user stays signed in here.
+function PasswordForm() {
+  const form = useForm<z.input<typeof passwordFormSchema>, unknown, z.output<typeof passwordFormSchema>>({
+    resolver: zodResolver(passwordFormSchema),
+    defaultValues: { currentPassword: '', newPassword: '' },
+  })
+  const { errors, isSubmitting, isDirty } = form.formState
+  const [changed, setChanged] = useState(false)
+
+  async function onSubmit({ currentPassword, newPassword }: z.output<typeof passwordFormSchema>) {
+    setChanged(false)
+    let result
+    try {
+      result = await authClient.changePassword({ currentPassword, newPassword, revokeOtherSessions: true })
+    } catch {
+      return form.setError('root', { message: "Couldn't reach For Wealth. Check your connection and try again." })
+    }
+    const { error } = result
+    if (!error) {
+      form.reset()
+      return setChanged(true)
+    }
+
+    if (error.code === ('INVALID_PASSWORD' satisfies AuthErrorCode)) {
+      return form.setError('currentPassword', { message: 'Current password is wrong' }, { shouldFocus: true })
+    }
+    if (NEW_PASSWORD_ERRORS.includes(error.code as AuthErrorCode)) {
+      return form.setError(
+        'newPassword',
+        { message: error.message ?? 'Choose a different password.' },
+        { shouldFocus: true },
+      )
+    }
+    form.setError('root', {
+      message:
+        error.status === 429
+          ? 'Too many attempts. Wait a minute, then try again.'
+          : "Your password wasn't changed. Try again.",
+    })
+  }
+
+  return (
+    <form noValidate onSubmit={form.handleSubmit(onSubmit)}>
+      <FieldGroup>
+        <Field data-invalid={!!errors.currentPassword}>
+          <FieldLabel htmlFor="currentPassword">Current password</FieldLabel>
+          <Input
+            id="currentPassword"
+            type="password"
+            autoComplete="current-password"
+            className="sm:max-w-sm"
+            aria-invalid={!!errors.currentPassword}
+            aria-describedby="currentPassword-error"
+            {...form.register('currentPassword')}
+          />
+          <FieldError id="currentPassword-error" errors={[errors.currentPassword]} />
+        </Field>
+        <Field data-invalid={!!errors.newPassword}>
+          <FieldLabel htmlFor="newPassword">New password</FieldLabel>
+          <Input
+            id="newPassword"
+            type="password"
+            autoComplete="new-password"
+            className="sm:max-w-sm"
+            aria-invalid={!!errors.newPassword}
+            aria-describedby="newPassword-hint newPassword-error"
+            {...form.register('newPassword')}
+          />
+          <FieldDescription id="newPassword-hint">
+            At least {PASSWORD_MIN_LENGTH} characters. A few unrelated words work well.
+          </FieldDescription>
+          <FieldError id="newPassword-error" errors={[errors.newPassword]} />
+        </Field>
+        <FieldError errors={[errors.root]} />
+        <p className="text-sm">Changing it signs you out on every other device.</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Changing password…' : 'Change password'}
+          </Button>
+          {changed && !isDirty && (
+            <p role="status" className="text-sm text-muted-foreground">
+              Password changed. Other devices have been signed out.
             </p>
           )}
         </div>
