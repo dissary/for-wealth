@@ -1,6 +1,19 @@
-import { type CategoryKind, categoryNameSchema, type MoveDirection } from '@for-wealth/shared'
+import {
+  type CalendarMonth,
+  type CategoryKind,
+  type CurrencyCode,
+  categoryNameSchema,
+  firstDayOf,
+  formatAmount,
+  formatPeriodLabel,
+  formatSchedule,
+  type MoveDirection,
+  monthOf,
+  type Schedule,
+} from '@for-wealth/shared'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { ArrowDownIcon, ArrowUpIcon, PlusIcon } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -9,8 +22,11 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { useToday } from '@/hooks/use-today'
 import { api } from '@/lib/api'
+import { budgetsQuery } from '@/lib/budgets'
 import { type Category, categoriesQuery, KIND_LABELS, refreshAfterCategoryChange } from '@/lib/categories'
+import type { Me } from '@/lib/me'
 import { isTooManyWrites, TOO_MANY_WRITES } from '@/lib/write-limit'
 
 // Income first, as the spec lists them.
@@ -19,16 +35,22 @@ const LIST_ORDER: readonly CategoryKind[] = ['income', 'expense']
 const CANT_REACH = "Couldn't reach For Wealth. Check your connection and try again."
 
 // Settings' Categories: an Income and an Expense list, each in the order
-// every picker uses, with Rename, up and down on each row and an Add button
-// per kind. Kind is chosen when adding and fixed afterwards (ADR 0005).
-export function CategorySettings() {
+// every picker uses, with Rename, up and down and Archive on each row and an
+// Add button per kind, then the archived ones under a collapsed heading. Kind
+// is chosen when adding and fixed afterwards (ADR 0005).
+export function CategorySettings({ me }: { me: Me }) {
   const categories = useQuery(categoriesQuery)
+  // This month in the user's time zone, the one archiving ends a Budget from.
+  const thisMonth = monthOf(useToday(me.timeZone))
   // Closing keeps what it was opened for, so the title doesn't change while
   // it fades out.
   const [dialog, setDialog] = useState<{ open: boolean; kind: CategoryKind; category?: Category }>({
     open: false,
     kind: 'expense',
   })
+  const [archiving, setArchiving] = useState<{ open: boolean; category?: Category }>({ open: false })
+  // Read out once an archive is saved, as the row leaves the list.
+  const [archived, setArchived] = useState('')
 
   if (categories.isPending) return <p className="text-sm text-muted-foreground">Loading…</p>
   if (categories.isError) {
@@ -54,13 +76,29 @@ export function CategorySettings() {
           list={categories.data[kind]}
           onAdd={() => setDialog({ open: true, kind })}
           onRename={(category) => setDialog({ open: true, kind, category })}
+          onArchive={(category) => {
+            setArchived('')
+            setArchiving({ open: true, category })
+          }}
         />
       ))}
+      <p role="status" className="sr-only">
+        {archived}
+      </p>
+      <ArchivedCategories archived={categories.data.archived} />
       <CategoryNameDialog
         open={dialog.open}
         onOpenChange={(open) => setDialog((current) => ({ ...current, open }))}
         kind={dialog.kind}
         category={dialog.category}
+      />
+      <ArchiveDialog
+        open={archiving.open}
+        onOpenChange={(open) => setArchiving((current) => ({ ...current, open }))}
+        category={archiving.category}
+        month={thisMonth}
+        currency={me.currency}
+        onArchived={(category) => setArchived(`Archived ${category.name}.`)}
       />
     </>
   )
@@ -71,11 +109,13 @@ function CategoryList({
   list,
   onAdd,
   onRename,
+  onArchive,
 }: {
   kind: CategoryKind
   list: Category[]
   onAdd: () => void
   onRename: (category: Category) => void
+  onArchive: (category: Category) => void
 }) {
   const queryClient = useQueryClient()
   const [moving, setMoving] = useState(false)
@@ -143,6 +183,15 @@ function CategoryList({
                 >
                   <ArrowDownIcon aria-hidden="true" />
                 </MoveButton>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-haspopup="dialog"
+                  aria-label={`Archive ${category.name}`}
+                  onClick={() => onArchive(category)}
+                >
+                  Archive
+                </Button>
               </div>
             </li>
           ))}
@@ -186,6 +235,222 @@ function MoveButton({
     >
       {children}
     </Button>
+  )
+}
+
+// The archived Categories, Income first, under a heading that starts
+// collapsed, each with Restore. Restoring needs no confirmation, as it's
+// undone by archiving again. None archived, no heading.
+function ArchivedCategories({ archived }: { archived: Record<CategoryKind, Category[]> }) {
+  const queryClient = useQueryClient()
+  const [restoring, setRestoring] = useState(false)
+  const [error, setError] = useState<string>()
+  // Read out once a restore shows, as the row moves to its kind's list.
+  const [restored, setRestored] = useState('')
+  const list = LIST_ORDER.flatMap((kind) => archived[kind])
+
+  async function restore(category: Category) {
+    setRestoring(true)
+    setError(undefined)
+    setRestored('')
+    let res
+    try {
+      res = await api.categories[':id'].restore.$post({ param: { id: category.id } })
+    } catch {
+      setRestoring(false)
+      return setError(CANT_REACH)
+    }
+    if (res.ok || res.status === 404) await refreshAfterCategoryChange(queryClient)
+    setRestoring(false)
+
+    if (res.ok) return setRestored(`Restored ${category.name}. It's last in the ${KIND_LABELS[category.kind]} list.`)
+    if (res.status === 404) return setError(`${category.name} is no longer available, so it wasn't restored.`)
+    if (res.status === 409) return setError((await res.json()).message)
+    setError(isTooManyWrites(res) ? TOO_MANY_WRITES : `${category.name} wasn't restored. Try again.`)
+  }
+
+  return (
+    <>
+      <p role="status" className="sr-only">
+        {restored}
+      </p>
+      {list.length > 0 && (
+        <details>
+          <summary className="w-fit cursor-pointer font-medium">Archived ({list.length})</summary>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Hidden from pickers; past Transactions keep them. Restore one to use it again.
+          </p>
+          <ul aria-label="Archived Categories" className="mt-3 divide-y border-y">
+            {list.map((category) => (
+              <li key={category.id} className="flex items-center gap-2 py-1.5">
+                <span className="min-w-0 flex-1 break-words">
+                  {category.name}
+                  <span className="ml-2 text-sm text-muted-foreground">{KIND_LABELS[category.kind]}</span>
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Restore ${category.name}`}
+                  aria-disabled={restoring}
+                  className="shrink-0 aria-disabled:cursor-default aria-disabled:opacity-50 aria-disabled:hover:bg-transparent"
+                  onClick={() => {
+                    if (!restoring) void restore(category)
+                  }}
+                >
+                  Restore
+                </Button>
+              </li>
+            ))}
+          </ul>
+          <FieldError className="mt-3">{error}</FieldError>
+        </details>
+      )}
+    </>
+  )
+}
+
+// Asks before archiving a Category: a dialog over the page, a sheet on a
+// phone. It says what happens to the Category's Budget, if it has one this
+// month (v1-spec "Settings").
+function ArchiveDialog({
+  open,
+  onOpenChange,
+  category,
+  month,
+  currency,
+  onArchived,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  category: Category | undefined
+  month: CalendarMonth
+  currency: CurrencyCode
+  onArchived: (category: Category) => void
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        {/* Inside the content, so each opening starts afresh. */}
+        {category && (
+          <ArchiveConfirm
+            category={category}
+            month={month}
+            currency={currency}
+            onCancel={() => onOpenChange(false)}
+            onArchived={() => {
+              onArchived(category)
+              onOpenChange(false)
+            }}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// A Recurring Transaction that isn't stopped under the Category, which keeps
+// it from being archived, as the refusal names it.
+interface BlockingRecurring {
+  id: string
+  amount: number
+  note: string | null
+  schedule: Schedule
+}
+
+// The question, then Archive or Keep it. Refused, it says why, and names the
+// Recurring Transactions to move to another Category or stop first.
+function ArchiveConfirm({
+  category,
+  month,
+  currency,
+  onCancel,
+  onArchived,
+}: {
+  category: Category
+  month: CalendarMonth
+  currency: CurrencyCode
+  onCancel: () => void
+  onArchived: () => void
+}) {
+  const queryClient = useQueryClient()
+  // Only an Expense Category has a Budget.
+  const budgets = useQuery({ ...budgetsQuery(month), enabled: category.kind === 'expense' })
+  const limit = budgets.data?.find((budget) => budget.category.id === category.id)?.limit ?? null
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
+  const [blocking, setBlocking] = useState<BlockingRecurring[]>([])
+
+  async function onConfirm() {
+    setBusy(true)
+    setError(undefined)
+    setBlocking([])
+    let res
+    try {
+      res = await api.categories[':id'].archive.$post({ param: { id: category.id } })
+    } catch {
+      setBusy(false)
+      return setError(CANT_REACH)
+    }
+    if (res.ok || res.status === 404) await refreshAfterCategoryChange(queryClient)
+    setBusy(false)
+
+    if (res.ok) return onArchived()
+    if (res.status === 404) {
+      return setError(`${category.name} is no longer available. Close this to see your Categories.`)
+    }
+    if (res.status === 409) {
+      const refusal = await res.json()
+      if (refusal.code === 'CATEGORY_HAS_RECURRING') setBlocking(refusal.recurring)
+      return setError(refusal.message)
+    }
+    setError(isTooManyWrites(res) ? TOO_MANY_WRITES : `${category.name} wasn't archived. Try again.`)
+  }
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle className="break-words">Archive {category.name}?</DialogTitle>
+        <DialogDescription>
+          It's hidden from pickers; past Transactions keep it.
+          {limit !== null &&
+            ` Its ${formatAmount(limit, currency)} Budget ends from ${formatPeriodLabel('month', firstDayOf(month))}.`}
+        </DialogDescription>
+      </DialogHeader>
+      <div className="flex flex-col gap-3">
+        <FieldError>{error}</FieldError>
+        {blocking.length > 0 && (
+          <>
+            <ul aria-label={`Recurring Transactions under ${category.name}`} className="divide-y border-y text-sm">
+              {blocking.map((recurring) => (
+                <li key={recurring.id} className="flex items-baseline justify-between gap-4 py-2">
+                  <span className="min-w-0">
+                    <span className="block">{formatSchedule(recurring.schedule)}</span>
+                    {recurring.note && (
+                      <span className="block truncate text-muted-foreground">{recurring.note}</span>
+                    )}
+                  </span>
+                  <span className="shrink-0 tabular-nums">
+                    {formatAmount(recurring.amount, currency, category.kind)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <Link to="/recurring" className="w-fit text-sm underline underline-offset-4">
+              Go to Recurring Transactions
+            </Link>
+          </>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {/* Waits for the Budget, so the question above is the whole of it. */}
+          <Button variant="destructive" disabled={busy || budgets.isLoading} onClick={onConfirm} autoFocus>
+            {busy ? 'Archiving…' : `Archive ${category.name}`}
+          </Button>
+          <Button variant="outline" disabled={busy} onClick={onCancel}>
+            Keep it
+          </Button>
+        </div>
+      </div>
+    </>
   )
 }
 

@@ -45,7 +45,7 @@ function SettingsPage() {
         </p>
       </Section>
       <Section id="categories" title="Categories">
-        <CategorySettings />
+        <CategorySettings me={me} />
       </Section>
     </main>
   )

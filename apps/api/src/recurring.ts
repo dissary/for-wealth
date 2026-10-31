@@ -146,6 +146,29 @@ export async function listRecurring(userId: string) {
   return { active, stopped }
 }
 
+// The user's Recurring Transactions that aren't stopped under one Category,
+// by next Due Date, which keep it from being archived. Read inside the
+// archiving transaction, once the Category's row is locked.
+export async function activeUnder(tx: Pick<typeof db, 'select'>, userId: string, categoryId: string) {
+  const rows = await tx
+    .select({
+      id: rt.id,
+      amount: rt.amount,
+      note: rt.note,
+      frequency: rt.frequency,
+      day: rt.day,
+      weekday: rt.weekday,
+      month: rt.month,
+    })
+    .from(rt)
+    .where(and(eq(rt.userId, userId), eq(rt.categoryId, categoryId), isNull(rt.stoppedAt)))
+    .orderBy(asc(rt.nextDueDate), asc(rt.createdAt), asc(rt.id))
+  return rows.map(({ frequency, day, weekday, month, ...rest }) => ({
+    ...rest,
+    schedule: scheduleOf({ frequency, day, weekday, month }),
+  }))
+}
+
 // One of the user's, stopped or not, or null when it isn't theirs.
 async function findRecurring(userId: string, id: string) {
   const [found] = await selectRecurring(userId, eq(rt.id, id))
@@ -167,11 +190,12 @@ export async function dueThrough(userId: string, through: CalendarDate) {
 // the user's that can be used, or they already have the most that aren't
 // stopped.
 export async function createRecurring(userId: string, { schedule, startDate, ...input }: NewRecurring) {
-  if (!(await canFileUnder(userId, input.categoryId))) return { refused: 'category' } as const
-
   return db.transaction(async (tx) => {
     // Locked, so two adds at the same moment can't both pass the limit.
     await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for('no key update')
+    // Checked in the transaction, so the Category can't be archived before
+    // this one is saved under it.
+    if (!(await canFileUnder(userId, input.categoryId, tx))) return { refused: 'category' } as const
     const [held] = await tx
       .select({ active: count() })
       .from(rt)
@@ -211,7 +235,7 @@ export async function updateRecurring(userId: string, id: string, changes: Recur
     if (
       fields.categoryId !== undefined &&
       fields.categoryId !== current.categoryId &&
-      !(await canFileUnder(userId, fields.categoryId))
+      !(await canFileUnder(userId, fields.categoryId, tx))
     ) {
       return { notFound: 'category' } as const
     }

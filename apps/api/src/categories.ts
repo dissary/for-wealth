@@ -1,4 +1,5 @@
 import {
+  type CalendarMonth,
   CATEGORY_KINDS,
   CATEGORY_LIMIT,
   type CategoryKind,
@@ -7,8 +8,10 @@ import {
   STARTER_CATEGORIES,
 } from '@for-wealth/shared'
 import { and, asc, count, eq, max, sql } from 'drizzle-orm'
+import { endBudget } from './budgets.js'
 import { db } from './db/client.js'
 import { categories, users } from './db/schema/index.js'
+import { activeUnder } from './recurring.js'
 
 // Writes the starter sets for a user who has no Categories at all (archived
 // included), and does nothing otherwise, so it is safe to run twice: sign-up
@@ -156,6 +159,77 @@ export async function moveCategory(userId: string, id: string, direction: MoveDi
         .where(and(eq(categories.userId, userId), eq(categories.id, categoryId)))
     }
     return true
+  })
+}
+
+// Archives one of the user's Categories: it leaves every picker, and its
+// Budget ends from `month`, this month in the user's time zone (v1-spec
+// "Budgets"). Archiving one already archived changes nothing. Says why when
+// it can't: it isn't theirs, it's the last of its kind that isn't archived,
+// or Recurring Transactions that aren't stopped use it, which it names.
+export async function archiveCategory(userId: string, id: string, month: CalendarMonth) {
+  return db.transaction(async (tx) => {
+    // Locked, as for adding, so two archives at the same moment can't both
+    // pass the last of a kind, and a restore can't pass the limit meanwhile.
+    await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for('no key update')
+    // The Category's row too, before anything under it is read: a Recurring
+    // Transaction or Budget being saved under it is either saved first, and
+    // seen here, or waits and finds it archived.
+    const [archiving] = await tx
+      .select({ kind: categories.kind, archived: categories.archived })
+      .from(categories)
+      .where(and(eq(categories.userId, userId), eq(categories.id, id)))
+      .for('no key update')
+    if (!archiving) return { notFound: true } as const
+    if (archiving.archived) return { archived: true } as const
+
+    const [held] = await tx
+      .select({ listed: count() })
+      .from(categories)
+      .where(and(eq(categories.userId, userId), eq(categories.kind, archiving.kind), eq(categories.archived, false)))
+    if (held!.listed <= 1) return { refused: 'last', kind: archiving.kind } as const
+
+    const recurring = await activeUnder(tx, userId, id)
+    if (recurring.length > 0) return { refused: 'recurring', recurring } as const
+
+    await tx
+      .update(categories)
+      .set({ archived: true })
+      .where(and(eq(categories.userId, userId), eq(categories.id, id)))
+    await endBudget(tx, userId, id, month)
+    return { archived: true } as const
+  })
+}
+
+// Restores one of the user's archived Categories, last in its kind. Its
+// Budget doesn't come back. Restoring one that isn't archived changes
+// nothing. Says why when it can't: it isn't theirs, or they already have the
+// most of the kind that aren't archived.
+export async function restoreCategory(userId: string, id: string) {
+  return db.transaction(async (tx) => {
+    // Locked, as for adding, so two restores at the same moment can't both
+    // pass the limit or take the same position.
+    await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for('no key update')
+    const [restoring] = await tx
+      .select({ kind: categories.kind, archived: categories.archived })
+      .from(categories)
+      .where(and(eq(categories.userId, userId), eq(categories.id, id)))
+    if (!restoring) return { notFound: true } as const
+    if (!restoring.archived) return { restored: true } as const
+
+    const ofKind = and(eq(categories.userId, userId), eq(categories.kind, restoring.kind))
+    const [held] = await tx
+      .select({ listed: count() })
+      .from(categories)
+      .where(and(ofKind, eq(categories.archived, false)))
+    if (held!.listed >= CATEGORY_LIMIT) return { refused: 'limit', kind: restoring.kind } as const
+
+    const [last] = await tx.select({ position: max(categories.position) }).from(categories).where(ofKind)
+    await tx
+      .update(categories)
+      .set({ archived: false, position: (last?.position ?? -1) + 1 })
+      .where(and(eq(categories.userId, userId), eq(categories.id, id)))
+    return { restored: true } as const
   })
 }
 

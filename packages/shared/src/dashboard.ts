@@ -91,7 +91,7 @@ export function monthFigures({
   month: CalendarMonth
   categories: readonly CategoryMonth[]
   recurring: readonly ActiveRecurringTransaction[]
-  budgets: readonly { category: { id: string; name: string }; limit: number | null }[]
+  budgets: readonly { category: { id: string; name: string; archived: boolean }; limit: number | null }[]
 }) {
   const { from, to } = periodRange('month', firstDayOf(month))
 
@@ -137,8 +137,8 @@ export function monthFigures({
   // Largest total first; equal totals fall back to the Category's position.
   // An archived Category with Expenses that month is still listed. A
   // Category with a Budget has a row even with no Expenses that month: those
-  // total 0, so they come last, in position order. Only Categories that
-  // aren't archived have Budgets in slice 4.
+  // total 0, so they come last, in position order. An archived Category
+  // keeps the limits it had before it was archived.
   const limits = new Map(budgets.map(({ category, limit }) => [category.id, limit]))
   const spentRows = categories
     .filter(({ category }) => category.kind === 'expense')
@@ -156,7 +156,11 @@ export function monthFigures({
   const spentIds = new Set(spentRows.map((row) => row.category.id))
   const unspentRows = budgets
     .filter(({ category, limit }) => limit !== null && !spentIds.has(category.id))
-    .map(({ category: { id, name }, limit }) => ({ category: { id, name, archived: false }, total: 0, budget: limit }))
+    .map(({ category: { id, name, archived }, limit }) => ({
+      category: { id, name, archived },
+      total: 0,
+      budget: limit,
+    }))
 
   return {
     totals,

@@ -2,13 +2,22 @@ import {
   CATEGORY_LIMIT,
   type CategoryKind,
   categoryChangesSchema,
+  monthOf,
   moveCategorySchema,
   newCategorySchema,
+  todayIn,
 } from '@for-wealth/shared'
 import { type Context, Hono } from 'hono'
 import { validator } from 'hono/validator'
 import { z } from 'zod'
-import { createCategory, listCategories, moveCategory, renameCategory } from '../categories.js'
+import {
+  archiveCategory,
+  createCategory,
+  listCategories,
+  moveCategory,
+  renameCategory,
+  restoreCategory,
+} from '../categories.js'
 import { parseFor } from '../parse-for.js'
 import { requireSession, type SignedInEnv } from '../require-session.js'
 import { limitWrites } from '../write-limit.js'
@@ -60,5 +69,27 @@ export const categories = new Hono<SignedInEnv>()
     const { id } = c.req.valid('param')
     const moved = await moveCategory(c.get('user').id, id, c.req.valid('json').direction)
     if (!moved) return categoryNotFound(c)
+    return c.body(null, 204)
+  })
+  .post('/:id/archive', idParam, async (c) => {
+    const user = c.get('user')
+    const result = await archiveCategory(user.id, c.req.valid('param').id, monthOf(todayIn(user.timeZone)))
+    if ('notFound' in result) return categoryNotFound(c)
+    if (result.refused === 'last') {
+      const message = `This is your last ${KIND_LABELS[result.kind]} Category. Add another before archiving it.`
+      return c.json({ code: 'LAST_CATEGORY' as const, message }, 409)
+    }
+    if (result.refused === 'recurring') {
+      // Named, so Settings can list them to move to another Category or stop.
+      const message =
+        'Recurring Transactions use this Category. Move them to another Category or stop them first.'
+      return c.json({ code: 'CATEGORY_HAS_RECURRING' as const, message, recurring: result.recurring }, 409)
+    }
+    return c.body(null, 204)
+  })
+  .post('/:id/restore', idParam, async (c) => {
+    const result = await restoreCategory(c.get('user').id, c.req.valid('param').id)
+    if ('notFound' in result) return categoryNotFound(c)
+    if (result.refused === 'limit') return categoryLimit(c, result.kind)
     return c.body(null, 204)
   })
