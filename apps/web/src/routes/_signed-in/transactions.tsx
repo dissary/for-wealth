@@ -7,6 +7,7 @@ import {
   formatDayLabel,
   formatPeriodLabel,
   isCalendarDate,
+  monthOf,
   type Period,
   periodSchema,
   stepPeriod,
@@ -17,6 +18,7 @@ import { createFileRoute, Link, redirect } from '@tanstack/react-router'
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from 'lucide-react'
 import { useState } from 'react'
 import { z } from 'zod'
+import { BudgetStanding } from '@/components/budget-standing'
 import { EstimateLabel, RecurringMark } from '@/components/markers'
 import { RowButton } from '@/components/row-button'
 import { Total } from '@/components/total'
@@ -125,6 +127,7 @@ function TransactionsPage() {
         <PeriodView
           listing={listing.data}
           currency={me.currency}
+          today={today}
           stale={listing.isPlaceholderData}
           onAdd={add}
           onEdit={(transaction) => setDialog({ open: true, transaction })}
@@ -239,12 +242,16 @@ function CategoryFilter({ category, filtered }: { category: string | undefined; 
 function PeriodView({
   listing,
   currency,
+  today,
   stale,
   onAdd,
   onEdit,
 }: {
   listing: Listing
   currency: CurrencyCode
+  // In the user's time zone, so this month's per-day figure moves on at
+  // their midnight.
+  today: CalendarDate
   // Still the previous Period's, while the new one loads.
   stale: boolean
   onAdd: () => void
@@ -261,6 +268,29 @@ function PeriodView({
         <Total label="Income" amount={formatAmount(listing.totals.income, currency)} />
         <Total label="Expenses" amount={formatAmount(listing.totals.expense, currency)} />
       </dl>
+
+      {/* A Month filtered to an Expense Category with a Budget: the API only
+          sends a limit then. Laid out as the Dashboard's budgeted row, with
+          the amount spent over "of" the limit; that's the filtered Expenses
+          total, counted the Dashboard's way (v1-spec "Polish"). */}
+      {listing.budget !== null && (
+        <section
+          aria-labelledby="budget"
+          className="grid max-w-md grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-2"
+        >
+          <h2 id="budget" className="text-sm text-muted-foreground">
+            Budget
+          </h2>
+          <span className="text-right font-medium tabular-nums">{formatAmount(listing.totals.expense, currency)}</span>
+          <BudgetStanding
+            spent={listing.totals.expense}
+            limit={listing.budget}
+            currency={currency}
+            month={monthOf(listing.date)}
+            today={today}
+          />
+        </section>
+      )}
 
       {listing.transactions.length === 0 ? (
         <div className="flex flex-col items-start gap-3 border-t pt-6">

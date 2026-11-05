@@ -1,12 +1,14 @@
 import {
   type CalendarDate,
   type CategoryKind,
+  monthOf,
   type NewTransaction,
   type Period,
   periodRange,
   type TransactionChanges,
 } from '@for-wealth/shared'
 import { and, asc, between, desc, eq, type SQL } from 'drizzle-orm'
+import { categoryLimit } from './budgets.js'
 import { db } from './db/client.js'
 import { categories, transactions } from './db/schema/index.js'
 
@@ -116,7 +118,9 @@ export async function deleteTransaction(userId: string, id: string) {
 // and the Period's Income and Expense totals. There's no paging: a Period is
 // at most a month of one person's spending.
 //
-// With a Category, the list and totals cover only that Category. Returns null
+// With a Category, the list and totals cover only that Category, and a Month
+// of an Expense Category carries its Budget: that month's limit, or null for
+// none. Every other listing carries null (v1-spec "Polish"). Returns null
 // when it isn't one of the user's, answered alike for someone else's and one
 // that doesn't exist. An archived Category is still theirs, and old
 // Transactions keep it, so it can still be browsed.
@@ -147,7 +151,10 @@ export async function listPeriod(
   const totals: Record<CategoryKind, number> = { income: 0, expense: 0 }
   for (const row of rows) totals[row.category.kind] += row.amount
 
-  return { period, date, category, totals, transactions: rows }
+  const budget =
+    period === 'month' && category?.kind === 'expense' ? await categoryLimit(userId, category.id, monthOf(date)) : null
+
+  return { period, date, category, totals, budget, transactions: rows }
 }
 
 // Every unconfirmed Estimate the user has, of any month, oldest first, so a

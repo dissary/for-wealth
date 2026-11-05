@@ -5,6 +5,7 @@ import app from '../src/app.js'
 import { db, pool } from '../src/db/client.js'
 import { categories, transactions, users } from '../src/db/schema/index.js'
 import {
+  archiveCategory,
   deleteTransaction,
   getCategories,
   getMe,
@@ -14,6 +15,7 @@ import {
   OTHER_USER,
   patchTransaction,
   postTransaction,
+  putBudgets,
   signInNewUser,
   startFresh,
 } from './helpers.js'
@@ -55,6 +57,7 @@ describe('POST /api/transactions', () => {
       date: TODAY,
       category: null,
       totals: { income: 0, expense: 1250 },
+      budget: null,
       transactions: [
         {
           id: expect.any(String),
@@ -246,6 +249,7 @@ describe('GET /api/transactions?period=day', () => {
 
 type Listing = {
   totals: { income: number; expense: number }
+  budget: number | null
   transactions: { amount: number; date: string; category: { name: string } }[]
 }
 
@@ -371,6 +375,66 @@ describe('GET /api/transactions: Category filter', () => {
     const res = await getTransactions(cookie, { period: 'week', date: '2026-03-02' })
 
     expect(await res.json()).toMatchObject({ category: null })
+  })
+})
+
+// v1-spec "Polish": a Month filtered to an Expense Category carries that
+// month's limit, so the Transactions page can show its Budget strip.
+describe('GET /api/transactions: Budget', () => {
+  it('answers the month’s limit for a Month filtered to an Expense Category, carried forward', async () => {
+    const cookie = await signInNewUser()
+    const food = await categoryId(cookie, 'expense', 'Food')
+    expect((await putBudgets(cookie, { month: '2026-02' }, { limits: [{ categoryId: food, limit: 50_000 }] })).status).toBe(204)
+
+    const before = await list(cookie, { period: 'month', date: '2026-01-15', category: food })
+    const set = await list(cookie, { period: 'month', date: '2026-02-10', category: food })
+    const carried = await list(cookie, { period: 'month', date: '2026-03-31', category: food })
+
+    expect([before.budget, set.budget, carried.budget]).toEqual([null, 50_000, 50_000])
+  })
+
+  it('answers null for a Day, a Week, an unfiltered Month and an Income filter', async () => {
+    const cookie = await signInNewUser()
+    const food = await categoryId(cookie, 'expense', 'Food')
+    const salary = await categoryId(cookie, 'income', 'Salary')
+    await putBudgets(cookie, { month: '2026-02' }, { limits: [{ categoryId: food, limit: 50_000 }] })
+    const date = '2026-02-10'
+
+    const listings = await Promise.all([
+      list(cookie, { period: 'day', date, category: food }),
+      list(cookie, { period: 'week', date, category: food }),
+      list(cookie, { period: 'month', date }),
+      list(cookie, { period: 'month', date, category: salary }),
+    ])
+
+    expect(listings.map((l) => l.budget)).toEqual([null, null, null, null])
+  })
+
+  // An archived Category keeps the limits it had before it was archived.
+  it('answers an archived Category’s limit in a month before it was archived', async () => {
+    const cookie = await signInNewUser()
+    const food = await categoryId(cookie, 'expense', 'Food')
+    await putBudgets(cookie, { month: '2026-02' }, { limits: [{ categoryId: food, limit: 50_000 }] })
+    expect((await archiveCategory(cookie, food)).status).toBe(204)
+
+    const february = await list(cookie, { period: 'month', date: '2026-02-10', category: food })
+    const thisMonth = await list(cookie, { period: 'month', date: TODAY, category: food })
+
+    expect([february.budget, thisMonth.budget]).toEqual([50_000, null])
+  })
+
+  it('never answers another user’s Budget', async () => {
+    const aisyah = await signInNewUser(NEW_USER)
+    const weiMing = await signInNewUser(OTHER_USER)
+    const herFood = await categoryId(aisyah, 'expense', 'Food')
+    const hisFood = await categoryId(weiMing, 'expense', 'Food')
+    await putBudgets(aisyah, { month: '2026-02' }, { limits: [{ categoryId: herFood, limit: 50_000 }] })
+
+    const his = await list(weiMing, { period: 'month', date: '2026-02-10', category: hisFood })
+    const hers = await getTransactions(weiMing, { period: 'month', date: '2026-02-10', category: herFood })
+
+    expect(his.budget).toBeNull()
+    expect(hers.status).toBe(404)
   })
 })
 
