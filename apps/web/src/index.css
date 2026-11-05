@@ -164,6 +164,11 @@
     }
   body {
     @apply bg-background text-foreground;
+    /* The page reaches under a phone's notch and home indicator
+       (viewport-fit=cover in index.html), so the tab bar's background does
+       too. Content stays clear of a notch at the sides; the bars pad their
+       own top and bottom edges. */
+    padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
     /* Every digit the same width, so amounts line up in columns. */
     font-variant-numeric: tabular-nums;
     }
