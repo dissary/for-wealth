@@ -69,6 +69,18 @@ async function withLimits<T extends { id: string }>(userId: string, month: Calen
   return rows.map((category) => ({ category, limit: limitIn(changes.get(category.id) ?? [], month) }))
 }
 
+// One Category's limit for the month, or null for no limit (ADR 0007). Any
+// of the user's Expense Categories, archived ones included, as a past month
+// keeps the limit it had before archiving (v1-spec "Polish").
+export async function categoryLimit(userId: string, categoryId: string, month: CalendarMonth) {
+  const changes = await changesByCategory(
+    db,
+    userId,
+    and(eq(budgets.categoryId, categoryId), lte(budgets.month, firstDayOf(month))),
+  )
+  return limitIn(changes.get(categoryId) ?? [], month)
+}
+
 // Sets each Category's limit from `month` on, all in one transaction, so
 // either every limit is saved or none is. Earlier months never change.
 // Each ID must be an ID; the route checks. Returns false, saving nothing,
