@@ -19,9 +19,10 @@ import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from 'lucide-react'
 import { useState } from 'react'
 import { z } from 'zod'
 import { BudgetStanding } from '@/components/budget-standing'
+import { FloatingAddButton } from '@/components/floating-add-button'
 import { EstimateLabel, RecurringMark } from '@/components/markers'
 import { PageTitle } from '@/components/page-title'
-import { RowButton } from '@/components/row-button'
+import { ROW_DETAIL, ROW_NAME, RowButton } from '@/components/row-button'
 import { Total } from '@/components/total'
 import { TransactionDialog } from '@/components/transaction-dialog'
 import { Button } from '@/components/ui/button'
@@ -136,6 +137,7 @@ function TransactionsPage() {
         />
       )}
 
+      <FloatingAddButton onClick={add} />
       <TransactionDialog
         open={dialog.open}
         onOpenChange={(open) => setDialog((current) => ({ ...current, open }))}
@@ -200,12 +202,14 @@ function CategoryFilter({ category, filtered }: { category: string | undefined; 
   const unlisted = category && listed && !listed.some((c) => c.id === category) ? category : null
 
   return (
-    <div className="flex items-center gap-2">
+    // A long Category name narrows the picker rather than widening the page.
+    <div className="flex max-w-full min-w-0 items-center gap-2">
       <label htmlFor="category-filter" className="text-sm text-muted-foreground">
         Category
       </label>
       <NativeSelect
         id="category-filter"
+        className="min-w-0"
         value={category ?? ''}
         disabled={!categories.data}
         onChange={(event) =>
@@ -349,14 +353,14 @@ function TransactionList({
       {transactions.map((transaction) => (
         <li key={transaction.id}>
           <RowButton onClick={() => onEdit(transaction)}>
-            <span className="min-w-0">
+            <span className={ROW_NAME}>
               <span className="flex items-center gap-2 font-medium">
                 {transaction.category.name}
                 {transaction.recurringTransactionId && <RecurringMark />}
                 {transaction.estimate && <EstimateLabel />}
               </span>
               {transaction.note && (
-                <span className="block truncate text-sm text-muted-foreground">{transaction.note}</span>
+                <span className={`${ROW_DETAIL} truncate text-sm text-muted-foreground`}>{transaction.note}</span>
               )}
             </span>
             {/* "+" for Income, no sign for Expenses, and no red or green. */}

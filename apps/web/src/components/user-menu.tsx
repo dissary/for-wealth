@@ -33,13 +33,15 @@ export function UserMenu({ me }: { me: Me }) {
   return (
     <div className="flex items-center gap-2">
       {state === 'failed' && (
-        <p role="alert" className="text-sm">
+        <p role="alert" className="min-w-0 text-sm">
           Couldn't sign out. Try again.
         </p>
       )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="max-w-48">
+          {/* Narrower on a phone, so a failed sign-out's message still fits
+              beside it and the app name. */}
+          <Button variant="ghost" className="max-w-36 sm:max-w-48">
             <span className="truncate">{me.name}</span>
             <ChevronDownIcon aria-hidden="true" className="text-muted-foreground" />
           </Button>

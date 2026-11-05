@@ -3,10 +3,12 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { ChevronRightIcon, PlusIcon } from 'lucide-react'
 import { useState } from 'react'
+import { FloatingAddButton } from '@/components/floating-add-button'
 import { VariesLabel } from '@/components/markers'
 import { PageTitle } from '@/components/page-title'
 import { RecurringDialog } from '@/components/recurring-dialog'
-import { RowButton } from '@/components/row-button'
+import { ROW, ROW_DETAIL, ROW_NAME, RowButton } from '@/components/row-button'
+import { TransactionDialog } from '@/components/transaction-dialog'
 import { Button } from '@/components/ui/button'
 import { useToday } from '@/hooks/use-today'
 import { type RecurringTransaction, recurringQuery } from '@/lib/recurring'
@@ -25,6 +27,9 @@ function RecurringPage() {
   // dialog doesn't turn into "Add" while it fades out.
   const [dialog, setDialog] = useState<{ open: boolean; recurring?: RecurringTransaction }>({ open: false })
   const add = () => setDialog({ open: true })
+  // A phone's floating button adds a Transaction, not a Recurring one, dated
+  // today, as on the Dashboard.
+  const [addingTransaction, setAddingTransaction] = useState(false)
 
   return (
     // A reading column, as on the Transactions page.
@@ -92,6 +97,14 @@ function RecurringPage() {
         timeZone={me.timeZone}
         today={today}
       />
+      <FloatingAddButton onClick={() => setAddingTransaction(true)} />
+      <TransactionDialog
+        open={addingTransaction}
+        onOpenChange={setAddingTransaction}
+        currency={me.currency}
+        timeZone={me.timeZone}
+        defaultDate={today}
+      />
     </main>
   )
 }
@@ -114,15 +127,15 @@ function RecurringList({
       {list.map((recurring) => {
         const content = (
           <>
-            <span className="min-w-0">
+            <span className={ROW_NAME}>
               <span className="flex items-center gap-2 font-medium">
                 {recurring.category.archived ? `${recurring.category.name} (archived)` : recurring.category.name}
                 {recurring.varies && <VariesLabel />}
               </span>
               {recurring.note && (
-                <span className="block truncate text-sm text-muted-foreground">{recurring.note}</span>
+                <span className={`${ROW_DETAIL} truncate text-sm text-muted-foreground`}>{recurring.note}</span>
               )}
-              <span className="block text-sm text-muted-foreground">
+              <span className={`${ROW_DETAIL} text-sm text-muted-foreground`}>
                 {formatSchedule(recurring.schedule)}
                 {!recurring.stoppedAt && <> · next on {formatDayLabel(recurring.nextDueDate)}</>}
               </span>
@@ -138,7 +151,7 @@ function RecurringList({
             {onEdit ? (
               <RowButton onClick={() => onEdit(recurring)}>{content}</RowButton>
             ) : (
-              <div className="flex items-baseline justify-between gap-4 py-3 text-muted-foreground">{content}</div>
+              <div className={`${ROW} py-3 text-muted-foreground`}>{content}</div>
             )}
           </li>
         )

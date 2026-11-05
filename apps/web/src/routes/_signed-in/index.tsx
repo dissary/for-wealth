@@ -23,9 +23,10 @@ import { z } from 'zod'
 import { BudgetStanding } from '@/components/budget-standing'
 import { BudgetsDialog } from '@/components/budgets-dialog'
 import { BudgetsWarning } from '@/components/budgets-warning'
+import { FloatingAddButton } from '@/components/floating-add-button'
 import { EstimateLabel } from '@/components/markers'
 import { PageTitle } from '@/components/page-title'
-import { RowButton } from '@/components/row-button'
+import { ROW, ROW_DETAIL, ROW_NAME, RowButton } from '@/components/row-button'
 import { Total } from '@/components/total'
 import { TransactionDialog } from '@/components/transaction-dialog'
 import { Button } from '@/components/ui/button'
@@ -143,6 +144,7 @@ function DashboardPage() {
         />
       )}
 
+      <FloatingAddButton onClick={add} />
       {/* Saving refreshes the Dashboard, as its totals are summed from the
           Transactions (lib/dashboard). */}
       <TransactionDialog
@@ -374,9 +376,9 @@ function EstimatesToConfirm({
         {estimates.map((estimate) => (
           <li key={estimate.id}>
             <RowButton onClick={() => onConfirm(estimate)}>
-              <span className="min-w-0">
+              <span className={ROW_NAME}>
                 <span className="block font-medium">{estimate.category.name}</span>
-                <span className="block truncate text-sm text-muted-foreground">
+                <span className={`${ROW_DETAIL} truncate text-sm text-muted-foreground`}>
                   {formatDayLabel(estimate.date)}
                   {estimate.note && ` · ${estimate.note}`}
                 </span>
@@ -431,13 +433,13 @@ function Upcoming({
       ) : (
         <ul aria-labelledby="upcoming" className="divide-y">
           {upcoming.map((due) => (
-            <li key={`${due.recurringTransactionId}-${due.dueDate}`} className="flex items-baseline justify-between gap-4 py-3">
-              <span className="min-w-0">
+            <li key={`${due.recurringTransactionId}-${due.dueDate}`} className={cn(ROW, 'py-3')}>
+              <span className={ROW_NAME}>
                 <span className="flex items-center gap-2 font-medium">
                   {due.category.archived ? `${due.category.name} (archived)` : due.category.name}
                   {due.estimate && <EstimateLabel />}
                 </span>
-                <span className="block truncate text-sm text-muted-foreground">
+                <span className={`${ROW_DETAIL} truncate text-sm text-muted-foreground`}>
                   {formatDayLabel(due.dueDate)}
                   {due.note && ` · ${due.note}`}
                 </span>
