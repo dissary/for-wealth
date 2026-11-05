@@ -7,6 +7,7 @@ import { type ReactNode, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import { CategorySettings } from '@/components/category-settings'
+import { PageTitle } from '@/components/page-title'
 import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -28,6 +29,7 @@ function SettingsPage() {
   return (
     // A reading column, as on the Transactions page.
     <main className="flex max-w-3xl flex-col gap-8 py-8 sm:py-12">
+      <PageTitle>Settings</PageTitle>
       <h1 className="font-heading text-4xl font-semibold tracking-tight sm:text-5xl">Settings</h1>
       <Section id="profile" title="Profile">
         <ProfileForm me={me} />

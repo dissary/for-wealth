@@ -5,6 +5,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
+import { PageTitle } from '@/components/page-title'
 import { ResetLinkRequestForm } from '@/components/reset-link-request'
 import { SignedOutPage } from '@/components/signed-out-page'
 import { Button } from '@/components/ui/button'
@@ -39,6 +40,7 @@ function ResetPassword() {
 
   return (
     <SignedOutPage>
+      <PageTitle>Reset password</PageTitle>
       {state === 'done' ? (
         <PasswordChanged />
       ) : !token || error || state === 'link-failed' ? (

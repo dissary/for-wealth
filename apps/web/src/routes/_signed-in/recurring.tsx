@@ -4,6 +4,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { ChevronRightIcon, PlusIcon } from 'lucide-react'
 import { useState } from 'react'
 import { VariesLabel } from '@/components/markers'
+import { PageTitle } from '@/components/page-title'
 import { RecurringDialog } from '@/components/recurring-dialog'
 import { RowButton } from '@/components/row-button'
 import { Button } from '@/components/ui/button'
@@ -28,6 +29,7 @@ function RecurringPage() {
   return (
     // A reading column, as on the Transactions page.
     <main className="flex max-w-3xl flex-col gap-6 py-8 sm:py-12">
+      <PageTitle>Recurring</PageTitle>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="font-heading text-4xl font-semibold tracking-tight sm:text-5xl">Recurring</h1>
         <Button size="lg" onClick={add}>

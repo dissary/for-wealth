@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { DevEmailNote } from '@/components/dev-email-note'
 import { NewVerificationLinkForm } from '@/components/new-verification-link'
+import { PageTitle } from '@/components/page-title'
 import { SignedOutPage } from '@/components/signed-out-page'
 import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -44,6 +45,7 @@ function SignIn() {
 
   return (
     <SignedOutPage>
+      <PageTitle>Sign in</PageTitle>
       <div className="flex flex-col gap-8">
         {error && <BrokenLink error={error} />}
         {unverified ? (

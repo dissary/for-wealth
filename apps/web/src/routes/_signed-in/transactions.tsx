@@ -20,6 +20,7 @@ import { useState } from 'react'
 import { z } from 'zod'
 import { BudgetStanding } from '@/components/budget-standing'
 import { EstimateLabel, RecurringMark } from '@/components/markers'
+import { PageTitle } from '@/components/page-title'
 import { RowButton } from '@/components/row-button'
 import { Total } from '@/components/total'
 import { TransactionDialog } from '@/components/transaction-dialog'
@@ -71,6 +72,7 @@ function TransactionsPage() {
     // A reading column under the wider header: each row is just a Category
     // and an amount, too far apart across the Dashboard's full width.
     <main className="flex max-w-3xl flex-col gap-6 py-8 sm:py-12">
+      <PageTitle>Transactions</PageTitle>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
           {formatPeriodLabel(period, date)}

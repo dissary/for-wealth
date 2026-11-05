@@ -1,8 +1,8 @@
 import { queryOptions } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import { meApi } from '@/lib/api'
 
 async function fetchMe() {
-  const res = await api.me.$get()
+  const res = await meApi.$get()
   if (res.status === 401) return null
   if (!res.ok) throw new Error(`Your details could not be loaded (${res.status})`)
   return res.json()

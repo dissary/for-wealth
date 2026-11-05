@@ -12,6 +12,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { DevEmailNote } from '@/components/dev-email-note'
 import { SendLinkAgainButton } from '@/components/new-verification-link'
+import { PageTitle } from '@/components/page-title'
 import { SignedOutPage } from '@/components/signed-out-page'
 import { Button } from '@/components/ui/button'
 import {
@@ -46,6 +47,7 @@ function SignUp() {
 
   return (
     <SignedOutPage>
+      <PageTitle>Sign up</PageTitle>
       {sentTo ? <CheckYourEmail email={sentTo} /> : <SignUpForm onSent={setSentTo} />}
     </SignedOutPage>
   )
