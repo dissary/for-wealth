@@ -1,5 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router'
+import { NotFoundPage } from '@/components/whole-page-message'
 
 export interface RouterContext {
   queryClient: QueryClient
@@ -7,4 +8,5 @@ export interface RouterContext {
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   component: Outlet,
+  notFoundComponent: NotFoundPage,
 })

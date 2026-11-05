@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { PageTitle } from '@/components/page-title'
 import { ResetLinkRequestForm } from '@/components/reset-link-request'
 import { SignedOutPage } from '@/components/signed-out-page'
 
@@ -9,6 +10,7 @@ export const Route = createFileRoute('/forgot-password')({
 function ForgotPassword() {
   return (
     <SignedOutPage>
+      <PageTitle>Reset your password</PageTitle>
       <section aria-labelledby="forgot-password-heading" className="flex flex-col gap-6">
         <div className="flex flex-col gap-2">
           <h2 id="forgot-password-heading" className="text-2xl font-semibold">

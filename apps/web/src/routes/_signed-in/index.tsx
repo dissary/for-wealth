@@ -24,6 +24,7 @@ import { BudgetStanding } from '@/components/budget-standing'
 import { BudgetsDialog } from '@/components/budgets-dialog'
 import { BudgetsWarning } from '@/components/budgets-warning'
 import { EstimateLabel } from '@/components/markers'
+import { PageTitle } from '@/components/page-title'
 import { RowButton } from '@/components/row-button'
 import { Total } from '@/components/total'
 import { TransactionDialog } from '@/components/transaction-dialog'
@@ -81,6 +82,7 @@ function DashboardPage() {
 
   return (
     <main className="flex flex-col gap-8 py-8 sm:gap-10 sm:py-12">
+      <PageTitle>Dashboard</PageTitle>
       {/* The month is the page, so it's set large, in the narrow heading cut,
           like the tagline on the sign-in page. */}
       <div className="flex flex-col gap-5">
@@ -258,7 +260,9 @@ function MonthView({
           {expenseCategories.length === 0 ? (
             // A dashed outline: the space the month's Expenses will fill.
             <div className="flex flex-col items-start gap-4 rounded-lg border border-dashed px-6 py-10">
-              <p className="text-muted-foreground">No Expenses in {label}.</p>
+              <p className="text-muted-foreground">
+                No Expenses in {label}. Each one you record is added up here under its Category.
+              </p>
               <Button variant="outline" onClick={onAdd}>
                 <PlusIcon aria-hidden="true" />
                 Add a Transaction
@@ -306,7 +310,12 @@ function MonthView({
           {estimates.length > 0 && (
             <EstimatesToConfirm estimates={estimates} currency={currency} onConfirm={onConfirm} />
           )}
-          <Upcoming upcoming={upcoming} currency={currency} label={label} />
+          <Upcoming
+            upcoming={upcoming}
+            currency={currency}
+            label={label}
+            past={dashboard.month < monthOf(today)}
+          />
         </div>
       </div>
     </div>
@@ -390,10 +399,14 @@ function Upcoming({
   upcoming,
   currency,
   label,
+  past,
 }: {
   upcoming: Dashboard['upcoming']
   currency: CurrencyCode
   label: string
+  // Everything due in a past month has been created, so there's nothing to
+  // set up for it.
+  past: boolean
 }) {
   return (
     <section aria-labelledby="upcoming" className="flex flex-col gap-3 border-t pt-5">
@@ -409,7 +422,12 @@ function Upcoming({
         </Link>
       </div>
       {upcoming.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nothing more is due in {label}.</p>
+        // The heading's Recurring link is where they're added, and it's
+        // there whether or not the user has any, so this doesn't repeat it.
+        <p className="text-sm text-muted-foreground">
+          Nothing more is due in {label}.
+          {!past && " Salary, rent and bills set up under Recurring show here until they're due."}
+        </p>
       ) : (
         <ul aria-labelledby="upcoming" className="divide-y">
           {upcoming.map((due) => (
