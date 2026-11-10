@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { FloatingAddButton } from '@/components/floating-add-button'
 import { VariesLabel } from '@/components/markers'
 import { PageTitle } from '@/components/page-title'
+import { EmptyPanel, PageHeading, PANEL } from '@/components/panel'
 import { RecurringDialog } from '@/components/recurring-dialog'
 import { ROW, ROW_DETAIL, ROW_NAME, RowButton } from '@/components/row-button'
 import { TransactionDialog } from '@/components/transaction-dialog'
@@ -33,10 +34,10 @@ function RecurringPage() {
 
   return (
     // A reading column, as on the Transactions page.
-    <main className="flex max-w-3xl flex-col gap-6 py-8 sm:py-12">
+    <main className="mx-auto flex w-full max-w-3xl flex-col gap-5 pt-4 pb-8 sm:gap-6 sm:pt-6 sm:pb-12">
       <PageTitle>Recurring</PageTitle>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="font-heading text-4xl font-semibold tracking-tight sm:text-5xl">Recurring</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <PageHeading>Recurring</PageHeading>
         <Button size="lg" onClick={add}>
           <PlusIcon aria-hidden="true" />
           Add Recurring Transaction
@@ -54,7 +55,7 @@ function RecurringPage() {
       )}
       {recurring.data &&
         (recurring.data.active.length === 0 ? (
-          <div className="flex flex-col items-start gap-3 border-t pt-6">
+          <EmptyPanel>
             <p className="max-w-prose text-muted-foreground">
               Add your salary, rent and bills once, and each is recorded on its Due Date. The Dashboard counts
               the ones still to come this month.
@@ -62,7 +63,7 @@ function RecurringPage() {
             <Button variant="outline" onClick={add}>
               Add a Recurring Transaction
             </Button>
-          </div>
+          </EmptyPanel>
         ) : (
           <RecurringList
             label="Recurring Transactions"
@@ -74,7 +75,7 @@ function RecurringPage() {
 
       {recurring.data && recurring.data.stopped.length > 0 && (
         // Collapsed: they create nothing more, so they're only for looking back.
-        <details className="group border-t pt-4">
+        <details className="group px-1">
           <summary className="flex w-fit cursor-pointer list-none items-center gap-1 rounded-md text-sm font-medium text-muted-foreground outline-none select-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
             <ChevronRightIcon aria-hidden="true" className="size-4 transition-transform group-open:rotate-90" />
             Stopped ({recurring.data.stopped.length})
@@ -123,7 +124,7 @@ function RecurringList({
   onEdit?: (recurring: RecurringTransaction) => void
 }) {
   return (
-    <ul aria-label={label} className="divide-y border-t">
+    <ul aria-label={label} className={`${PANEL} divide-y py-1.5 sm:py-2`}>
       {list.map((recurring) => {
         const content = (
           <>
@@ -151,7 +152,7 @@ function RecurringList({
             {onEdit ? (
               <RowButton onClick={() => onEdit(recurring)}>{content}</RowButton>
             ) : (
-              <div className={`${ROW} py-3 text-muted-foreground`}>{content}</div>
+              <div className={`${ROW} py-3.5 text-muted-foreground`}>{content}</div>
             )}
           </li>
         )

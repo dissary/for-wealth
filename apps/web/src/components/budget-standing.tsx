@@ -27,7 +27,7 @@ export function BudgetStanding({
   return (
     <>
       {/* The words say what the bar shows, so screen readers skip it. */}
-      <div aria-hidden="true" className="col-span-2 col-start-1 h-1.5 overflow-hidden rounded-full bg-border">
+      <div aria-hidden="true" className="col-span-2 col-start-1 h-2 overflow-hidden rounded-full bg-muted">
         <div
           className={cn('h-full rounded-full', progress.overspent ? 'bg-over-budget' : 'bg-under-budget')}
           style={{ width: `${progress.fill * 100}%` }}

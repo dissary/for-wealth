@@ -7,7 +7,7 @@ import { TriangleAlertIcon } from 'lucide-react'
 // in slice 5").
 export function BudgetsWarning({ overBy, currency }: { overBy: number; currency: CurrencyCode }) {
   return (
-    <p role="status" className="flex items-start gap-2 text-sm">
+    <p role="status" className="flex items-start gap-2.5 rounded-xl bg-muted px-3.5 py-3 text-sm">
       <TriangleAlertIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
       Budgets and Commitments come to {formatAmount(overBy, currency)} more than Expected Income.
     </p>

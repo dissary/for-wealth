@@ -12,7 +12,7 @@ export function FloatingAddButton({ onClick }: { onClick: () => void }) {
       aria-label="Add Transaction"
       aria-haspopup="dialog"
       onClick={onClick}
-      className="fixed right-[max(1rem,env(safe-area-inset-right))] bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg transition-colors outline-none hover:bg-primary-hover focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-px sm:hidden"
+      className="fixed right-[max(1rem,env(safe-area-inset-right))] bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-float transition-colors outline-none hover:bg-primary-hover focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-px sm:hidden"
     >
       <PlusIcon aria-hidden="true" className="size-6" />
     </button>

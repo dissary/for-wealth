@@ -98,7 +98,7 @@ function NewPasswordForm({
 
   return (
     <section aria-labelledby="new-password-heading" className="flex flex-col gap-6">
-      <h2 id="new-password-heading" className="text-2xl font-semibold">
+      <h2 id="new-password-heading" className="text-2xl font-semibold tracking-tight">
         Choose a new password
       </h2>
       <form noValidate onSubmit={form.handleSubmit(onSubmit)}>
@@ -136,7 +136,7 @@ function LinkNoLongerWorks() {
   return (
     <section aria-labelledby="link-failed-heading" className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <h2 id="link-failed-heading" role="alert" className="text-2xl font-semibold">
+        <h2 id="link-failed-heading" role="alert" className="text-2xl font-semibold tracking-tight">
           This link no longer works
         </h2>
         <p className="text-sm">
@@ -152,7 +152,7 @@ function LinkNoLongerWorks() {
 function PasswordChanged() {
   return (
     <section aria-labelledby="password-changed-heading" className="flex flex-col gap-3" role="status">
-      <h2 id="password-changed-heading" className="text-2xl font-semibold">
+      <h2 id="password-changed-heading" className="text-2xl font-semibold tracking-tight">
         Password changed
       </h2>
       <p>You've been signed out on every device. Sign in with your new password.</p>

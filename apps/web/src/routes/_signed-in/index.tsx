@@ -4,6 +4,7 @@ import {
   type CalendarMonth,
   type CurrencyCode,
   dashboardMonthSchema,
+  daysInMonth,
   EARLIEST_DATE,
   firstDayOf,
   formatAmount,
@@ -25,7 +26,9 @@ import { BudgetsDialog } from '@/components/budgets-dialog'
 import { BudgetsWarning } from '@/components/budgets-warning'
 import { FloatingAddButton } from '@/components/floating-add-button'
 import { EstimateLabel } from '@/components/markers'
+import { MonthDays } from '@/components/month-days'
 import { PageTitle } from '@/components/page-title'
+import { EmptyPanel, PageHeading, Panel, PanelTitle } from '@/components/panel'
 import { ROW, ROW_DETAIL, ROW_NAME, RowButton } from '@/components/row-button'
 import { Total } from '@/components/total'
 import { TransactionDialog } from '@/components/transaction-dialog'
@@ -82,15 +85,13 @@ function DashboardPage() {
       : undefined
 
   return (
-    <main className="flex flex-col gap-8 py-8 sm:gap-10 sm:py-12">
+    <main className="flex flex-col gap-5 pt-4 pb-8 sm:gap-6 sm:pt-6 sm:pb-12">
       <PageTitle>Dashboard</PageTitle>
-      {/* The month is the page, so it's set large, in the narrow heading cut,
-          like the tagline on the sign-in page. */}
-      <div className="flex flex-col gap-5">
-        <h1 className="font-heading text-5xl leading-[0.95] font-semibold tracking-tight sm:text-6xl lg:text-7xl">
-          {label}
-        </h1>
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* The month is the page's heading, with the controls that change it
+          beside it. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <PageHeading>{label}</PageHeading>
           <nav aria-label="Months" className="flex items-center gap-2">
             {/* ‹ › joined, as one control that steps either way. */}
             <div className="flex">
@@ -109,18 +110,18 @@ function DashboardPage() {
               </Button>
             )}
           </nav>
-          {/* Always shown, so Budgets can be set before a month has any
-              Expenses. */}
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="lg" variant="outline" onClick={() => setEditingBudgets(true)}>
-              <TargetIcon aria-hidden="true" />
-              Edit Budgets
-            </Button>
-            <Button size="lg" onClick={add}>
-              <PlusIcon aria-hidden="true" />
-              Add Transaction
-            </Button>
-          </div>
+        </div>
+        {/* Always shown, so Budgets can be set before a month has any
+            Expenses. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="lg" variant="outline" onClick={() => setEditingBudgets(true)}>
+            <TargetIcon aria-hidden="true" />
+            Edit Budgets
+          </Button>
+          <Button size="lg" onClick={add}>
+            <PlusIcon aria-hidden="true" />
+            Add Transaction
+          </Button>
         </div>
       </div>
 
@@ -220,16 +221,14 @@ function MonthView({
   const monthView: View = { period: 'month', date: firstDay }
 
   return (
-    <div aria-busy={stale} className="flex flex-col gap-10 transition-opacity aria-busy:opacity-60 sm:gap-12">
-      {/* Remaining first: what can still be spent this month. The figures it
-          is worked out from sit beside it (v1-spec "Dashboard maths"). The
-          labels say which is which, so no figure has a sign. */}
-      <section
-        aria-labelledby="remaining"
-        className="grid gap-x-16 gap-y-8 border-t pt-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)]"
-      >
+    <div aria-busy={stale} className="flex flex-col gap-5 transition-opacity aria-busy:opacity-60 sm:gap-6">
+      {/* Remaining first: what can still be spent this month, on the page's
+          one filled panel. The figures it is worked out from sit beside it
+          (v1-spec "Dashboard maths"). The labels say which is which, so no
+          figure has a sign. */}
+      <div className="grid gap-5 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
         <Remaining remaining={plan.remaining} currency={currency} month={dashboard.month} today={today} />
-        <dl className="grid grid-cols-2 content-start gap-x-6 gap-y-5">
+        <dl className="grid grid-cols-2 content-center gap-x-6 gap-y-6 rounded-2xl bg-card p-5 shadow-panel sm:p-6">
           {/* The recorded part is the link: the plan figure also counts
               Income still to come, which the Transactions page doesn't show. */}
           <Total
@@ -249,19 +248,17 @@ function MonthView({
           <Total label="Free to Spend" amount={formatAmount(plan.freeToSpend, currency)} />
           <Total label="Expenses" amount={formatAmount(totals.expense, currency)} view={monthView} />
         </dl>
-      </section>
+      </div>
 
       {/* Expenses by Category beside what's still to come from lg up;
           stacked on smaller screens. */}
-      <div className="grid gap-x-16 gap-y-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <section aria-labelledby="expenses-by-category" className="flex min-w-0 flex-col gap-3 border-t pt-5">
-          <h2 id="expenses-by-category" className="font-heading text-xl font-semibold tracking-tight">
-            Expenses by Category
-          </h2>
+      <div className="grid items-start gap-5 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <Panel aria-labelledby="expenses-by-category" className="flex min-w-0 flex-col gap-3">
+          <PanelTitle id="expenses-by-category">Expenses by Category</PanelTitle>
           {budgetsOverBy !== null && <BudgetsWarning overBy={budgetsOverBy} currency={currency} />}
           {expenseCategories.length === 0 ? (
             // A dashed outline: the space the month's Expenses will fill.
-            <div className="flex flex-col items-start gap-4 rounded-lg border border-dashed px-6 py-10">
+            <EmptyPanel>
               <p className="text-muted-foreground">
                 No Expenses in {label}. Each one you record is added up here under its Category.
               </p>
@@ -269,7 +266,7 @@ function MonthView({
                 <PlusIcon aria-hidden="true" />
                 Add a Transaction
               </Button>
-            </div>
+            </EmptyPanel>
           ) : (
             // Already in display order: largest total first, then budgeted
             // Categories with nothing spent. Columns are shared through
@@ -282,7 +279,7 @@ function MonthView({
                   <Link
                     to="/transactions"
                     search={{ ...monthView, category: category.id }}
-                    className="relative isolate col-span-full grid grid-cols-subgrid items-baseline gap-y-2 py-3.5 outline-none before:absolute before:inset-y-0 before:-inset-x-2 before:-z-10 before:rounded-md before:transition-colors hover:before:bg-muted focus-visible:before:ring-3 focus-visible:before:ring-ring/50"
+                    className="relative isolate col-span-full grid grid-cols-subgrid items-baseline gap-y-2 py-4 outline-none before:absolute before:inset-y-0 before:-inset-x-3 before:-z-10 before:rounded-xl before:transition-colors hover:before:bg-muted focus-visible:before:ring-3 focus-visible:before:ring-ring/50"
                   >
                     <span className="min-w-0 font-medium">
                       {category.archived ? `${category.name} (archived)` : category.name}
@@ -306,9 +303,9 @@ function MonthView({
               ))}
             </ul>
           )}
-        </section>
+        </Panel>
 
-        <div className="flex min-w-0 flex-col gap-10">
+        <div className="flex min-w-0 flex-col gap-5 sm:gap-6">
           {estimates.length > 0 && (
             <EstimatesToConfirm estimates={estimates} currency={currency} onConfirm={onConfirm} />
           )}
@@ -339,20 +336,41 @@ function Remaining({
   today: CalendarDate
 }) {
   const daily = remaining > 0 ? perDayLeft(remaining, month, today) : null
+  const [year, monthNumber] = month.split('-').map(Number)
+  const days = daysInMonth(year, monthNumber)
+  // How far through the month today is: all of a past month, none of a
+  // future one.
+  const thisMonth = monthOf(today)
+  const day = month < thisMonth ? days + 1 : month > thisMonth ? 0 : Number(today.slice(-2))
   return (
-    <div className="flex flex-col gap-1">
-      <h2 id="remaining" className="text-sm text-muted-foreground">
-        Remaining
-      </h2>
-      <p className="font-heading text-5xl leading-none font-semibold tracking-tight tabular-nums wrap-anywhere sm:text-6xl">
-        {remaining < 0 ? `Over by ${formatAmount(-remaining, currency)}` : formatAmount(remaining, currency)}
-      </p>
-      {daily !== null && (
-        <p className="pt-1 text-muted-foreground tabular-nums">
-          {formatAmount(daily, currency)}/day for the rest of the month
+    <section
+      aria-labelledby="remaining"
+      className="flex flex-col justify-between gap-8 rounded-3xl bg-hero p-6 text-hero-foreground shadow-float sm:p-8"
+    >
+      <div className="flex flex-col gap-2">
+        <h2 id="remaining" className="font-sans text-sm font-medium text-hero-muted">
+          Remaining
+        </h2>
+        <p className="text-4xl leading-none font-semibold tracking-tight tabular-nums wrap-anywhere sm:text-6xl">
+          {remaining < 0 ? `Over by ${formatAmount(-remaining, currency)}` : formatAmount(remaining, currency)}
         </p>
-      )}
-    </div>
+        {daily !== null && (
+          <p className="pt-1 text-hero-muted tabular-nums">
+            {formatAmount(daily, currency)}/day for the rest of the month
+          </p>
+        )}
+      </div>
+      {/* The month's days, up to today. This month says where today falls in
+          words too. */}
+      <div className="flex flex-col gap-2.5">
+        <MonthDays days={days} today={day} />
+        {month === thisMonth && (
+          <p className="text-sm text-hero-muted tabular-nums">
+            Day {day} of {days}
+          </p>
+        )}
+      </div>
+    </section>
   )
 }
 
@@ -368,10 +386,8 @@ function EstimatesToConfirm({
   onConfirm: (estimate: Transaction) => void
 }) {
   return (
-    <section aria-labelledby="estimates-to-confirm" className="flex flex-col gap-3 border-t pt-5">
-      <h2 id="estimates-to-confirm" className="font-heading text-xl font-semibold tracking-tight">
-        Estimates to confirm
-      </h2>
+    <Panel aria-labelledby="estimates-to-confirm" className="flex flex-col gap-2">
+      <PanelTitle id="estimates-to-confirm">Estimates to confirm</PanelTitle>
       <ul aria-labelledby="estimates-to-confirm" className="divide-y">
         {estimates.map((estimate) => (
           <li key={estimate.id}>
@@ -391,7 +407,7 @@ function EstimatesToConfirm({
           </li>
         ))}
       </ul>
-    </section>
+    </Panel>
   )
 }
 
@@ -411,14 +427,12 @@ function Upcoming({
   past: boolean
 }) {
   return (
-    <section aria-labelledby="upcoming" className="flex flex-col gap-3 border-t pt-5">
+    <Panel aria-labelledby="upcoming" className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between gap-4">
-        <h2 id="upcoming" className="font-heading text-xl font-semibold tracking-tight">
-          Upcoming
-        </h2>
+        <PanelTitle id="upcoming">Upcoming</PanelTitle>
         <Link
           to="/recurring"
-          className="rounded-md text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="rounded-md text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           Recurring
         </Link>
@@ -433,7 +447,7 @@ function Upcoming({
       ) : (
         <ul aria-labelledby="upcoming" className="divide-y">
           {upcoming.map((due) => (
-            <li key={`${due.recurringTransactionId}-${due.dueDate}`} className={cn(ROW, 'py-3')}>
+            <li key={`${due.recurringTransactionId}-${due.dueDate}`} className={cn(ROW, 'py-3.5')}>
               <span className={ROW_NAME}>
                 <span className="flex items-center gap-2 font-medium">
                   {due.category.archived ? `${due.category.name} (archived)` : due.category.name}
@@ -449,6 +463,6 @@ function Upcoming({
           ))}
         </ul>
       )}
-    </section>
+    </Panel>
   )
 }

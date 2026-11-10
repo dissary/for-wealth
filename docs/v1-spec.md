@@ -356,11 +356,13 @@ Each slice works all the way from the database to the screen.
 
 Use the `frontend-design` skill when building the UI. Replace shadcn/ui's default theme (colours, corner radius, font). Use one accent colour, and save red and green for over-Budget and under-Budget. For layout ideas, look at real finance apps (Copilot Money, Monarch, Lunch Money).
 
-The theme (slice 1, decided 2026-10-21) lives as tokens in `apps/web/src/index.css`. Components use the tokens, never their own colours.
+The theme lives as tokens in `apps/web/src/index.css`. Components use the tokens, never their own colours. It was first decided in slice 1 (2026-10-21) and redesigned on 2026-11-10 to be softer and warmer: panels instead of ruled sections, warm neutrals and a plum accent in place of indigo.
 
-- **Accent**: batik indigo (`#3e4eb3` light, `#92a6f1` dark), for primary actions, links and focus. Neutrals are tinted with the same hue. Indigo is far from both red and green, so it never reads as a Budget signal.
+- **Accent**: plum (`#663e8e` light, a lighter plum in dark), the colour of the RM100 note, for primary actions, links and focus. It is far from both red and green, so it never reads as a Budget signal.
+- **Neutrals**: warm paper (hue 80) in light mode, plum-tinted in dark. The page is a step darker than the panels on it.
 - **Red and green**: the `over-budget` and `under-budget` tokens only. So `destructive` (delete buttons, invalid fields) is ink, not red: the wording ("Delete Transaction") and a confirmation step carry the warning, which also works for people who can't tell red from green. For the same reason, an invalid form field always says what's wrong in words, not only with its border.
-- **Type**: Instrument Sans, bundled from npm. Headings use its width axis at 85% (narrower). All digits are tabular (the same width), so amounts line up.
-- **Corners**: 0.375rem base radius, tighter than shadcn's default.
+- **Panels**: content sits on panels (`components/panel.tsx`) with soft corners and a faint shadow tinted with the accent. The Dashboard's Remaining panel is the one filled surface (the `hero` tokens), and shows the month as a row of days up to today.
+- **Type**: Figtree for text and amounts, Bricolage Grotesque for headings, both bundled from npm. All digits are tabular (the same width), so amounts line up.
+- **Corners**: 0.75rem base radius. Buttons and switches are pills, panels use a larger radius, and the Remaining panel the largest.
 - **Light and dark**: follows the device setting, in CSS only. A manual switch can come later if wanted.
 - **Checked by tests** (`apps/web/test/`): text contrast meets WCAG AA in both modes, red and green appear only in the Budget tokens, components hard-code no colours, the stylesheet loads nothing from another address, and transitions and animations stop when the device asks for reduced motion.

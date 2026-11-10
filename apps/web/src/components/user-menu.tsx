@@ -41,7 +41,14 @@ export function UserMenu({ me }: { me: Me }) {
         <DropdownMenuTrigger asChild>
           {/* Narrower on a phone, so a failed sign-out's message still fits
               beside it and the app name. */}
-          <Button variant="ghost" className="max-w-36 sm:max-w-48">
+          <Button variant="ghost" className="max-w-40 pl-1.5 sm:max-w-52">
+            {/* The name's first letter, as the account's mark. */}
+            <span
+              aria-hidden="true"
+              className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-primary uppercase"
+            >
+              {[...me.name.trim()][0]}
+            </span>
             <span className="truncate">{me.name}</span>
             <ChevronDownIcon aria-hidden="true" className="text-muted-foreground" />
           </Button>
