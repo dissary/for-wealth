@@ -8,6 +8,7 @@ import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import { CategorySettings } from '@/components/category-settings'
 import { PageTitle } from '@/components/page-title'
+import { PageHeading, Panel, PanelTitle } from '@/components/panel'
 import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -28,9 +29,9 @@ function SettingsPage() {
 
   return (
     // A reading column, as on the Transactions page.
-    <main className="flex max-w-3xl flex-col gap-8 py-8 sm:py-12">
+    <main className="mx-auto flex w-full max-w-3xl flex-col gap-5 pt-4 pb-8 sm:gap-6 sm:pt-6 sm:pb-12">
       <PageTitle>Settings</PageTitle>
-      <h1 className="font-heading text-4xl font-semibold tracking-tight sm:text-5xl">Settings</h1>
+      <PageHeading>Settings</PageHeading>
       <Section id="profile" title="Profile">
         <ProfileForm me={me} />
       </Section>
@@ -55,12 +56,10 @@ function SettingsPage() {
 
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={`${id}-heading`} className="flex flex-col gap-4 border-t pt-6">
-      <h2 id={`${id}-heading`} className="text-xl font-semibold">
-        {title}
-      </h2>
+    <Panel aria-labelledby={`${id}-heading`} className="flex flex-col gap-4">
+      <PanelTitle id={`${id}-heading`}>{title}</PanelTitle>
       {children}
-    </section>
+    </Panel>
   )
 }
 
@@ -319,7 +318,7 @@ function TimeZoneForm({ savedZone }: { savedZone: string }) {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-          <div className="max-h-64 overflow-y-auto rounded-lg border">
+          <div className="max-h-64 overflow-y-auto rounded-xl border">
             {matches.length === 0 ? (
               <p className="px-3 py-2 text-sm text-muted-foreground">No time zone matches “{search.trim()}”.</p>
             ) : (

@@ -2,9 +2,9 @@ import { Link, linkOptions } from '@tanstack/react-router'
 import { ReceiptTextIcon, RepeatIcon, WalletIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-// The three pages every signed-in user moves between: along the header's
-// bottom edge from sm up, and in a tab bar at the foot of a phone's screen
-// (v1-spec "The phone layout").
+// The three pages every signed-in user moves between: in the header from sm
+// up, and in a tab bar at the foot of a phone's screen (v1-spec "The phone
+// layout").
 const PAGES = [
   {
     label: 'Dashboard',
@@ -22,14 +22,14 @@ const PAGES = [
   { label: 'Recurring', icon: RepeatIcon, link: linkOptions({ to: '/recurring' }) },
 ]
 
-// The router marks the current page's link aria-current, and it is
-// underlined in the accent on the header's rule.
+// The router marks the current page's link aria-current, and it becomes a
+// raised pill, like the chosen side of a switch.
 const HEADER_LINK =
-  'relative flex h-14 items-center rounded-md px-1 text-sm text-muted-foreground transition-colors outline-none after:absolute after:inset-x-1 after:-bottom-px after:h-0.5 after:rounded-full hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 aria-[current=page]:font-medium aria-[current=page]:text-foreground aria-[current=page]:after:bg-primary'
+  'flex h-9 items-center rounded-full px-3.5 text-sm font-medium text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 aria-[current=page]:bg-card aria-[current=page]:text-foreground aria-[current=page]:shadow-panel'
 
 export function HeaderNav({ className }: { className?: string }) {
   return (
-    <nav aria-label="Main" className={cn('items-center gap-5', className)}>
+    <nav aria-label="Main" className={cn('items-center gap-1', className)}>
       {PAGES.map(({ label, link }) => (
         <Link key={label} {...link} className={HEADER_LINK}>
           {label}
@@ -39,11 +39,12 @@ export function HeaderNav({ className }: { className?: string }) {
   )
 }
 
-// The same marker as the header's, on the tab bar's own rule: the current
-// tab is barred in the accent along its top edge. Each tab is the bar's full
+// The current tab's icon sits on a tinted pill. Each tab is the bar's full
 // height, well over 44 px, and the bar clears the home indicator.
 const TAB =
-  'relative flex h-16 flex-col items-center justify-center gap-1 rounded-md text-xs text-muted-foreground transition-colors outline-none before:absolute before:inset-x-5 before:-top-px before:h-0.5 before:rounded-full focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50 aria-[current=page]:font-medium aria-[current=page]:text-foreground aria-[current=page]:before:bg-primary [&_svg]:size-5 aria-[current=page]:[&_svg]:text-primary'
+  'group flex h-16 flex-col items-center justify-center gap-0.5 text-xs text-muted-foreground transition-colors outline-none aria-[current=page]:font-semibold aria-[current=page]:text-foreground'
+const TAB_ICON =
+  'flex h-7 w-14 items-center justify-center rounded-full transition-colors group-focus-visible:ring-3 group-focus-visible:ring-ring/50 group-aria-[current=page]:bg-accent group-aria-[current=page]:text-primary [&_svg]:size-5'
 
 export function TabBar({ className }: { className?: string }) {
   return (
@@ -57,7 +58,9 @@ export function TabBar({ className }: { className?: string }) {
       <div className="grid grid-cols-3">
         {PAGES.map(({ label, icon: Icon, link }) => (
           <Link key={label} {...link} className={TAB}>
-            <Icon aria-hidden="true" />
+            <span className={TAB_ICON}>
+              <Icon aria-hidden="true" />
+            </span>
             {label}
           </Link>
         ))}

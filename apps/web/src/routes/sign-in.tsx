@@ -106,7 +106,7 @@ function SignInForm({
 
   return (
     <section aria-labelledby="sign-in-heading" className="flex flex-col gap-6">
-      <h2 id="sign-in-heading" className="text-2xl font-semibold">
+      <h2 id="sign-in-heading" className="text-2xl font-semibold tracking-tight">
         Sign in
       </h2>
       <form noValidate onSubmit={form.handleSubmit(onSubmit)}>
@@ -163,7 +163,7 @@ function SignInForm({
 
 function BrokenLink({ error }: { error: string }) {
   return (
-    <section aria-labelledby="broken-link-heading" className="flex flex-col gap-4 rounded-md bg-muted p-4">
+    <section aria-labelledby="broken-link-heading" className="flex flex-col gap-4 rounded-xl bg-muted p-4">
       <h2 id="broken-link-heading" role="alert" className="font-sans text-sm font-medium">
         {LINK_ERRORS[error as AuthErrorCode] ?? BROKEN_LINK}
       </h2>
@@ -176,7 +176,7 @@ function BrokenLink({ error }: { error: string }) {
 function CheckYourEmail({ email, onBack }: { email: string; onBack: () => void }) {
   return (
     <section aria-labelledby="check-email-heading" className="flex flex-col gap-3" role="status">
-      <h2 id="check-email-heading" className="text-2xl font-semibold">
+      <h2 id="check-email-heading" className="text-2xl font-semibold tracking-tight">
         Check your email
       </h2>
       <p>

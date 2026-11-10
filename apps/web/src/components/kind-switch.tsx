@@ -10,12 +10,12 @@ const SWITCH_ORDER: readonly CategoryKind[] = ['expense', 'income']
 // decides it (ADR 0005).
 export function KindSwitch({ field }: { field: UseFormRegisterReturn<'kind'> }) {
   return (
-    <fieldset className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
+    <fieldset className="grid grid-cols-2 gap-1 rounded-full bg-muted p-1">
       <legend className="sr-only">Income or Expense</legend>
       {SWITCH_ORDER.map((value) => (
         <label
           key={value}
-          className="flex h-8 cursor-pointer items-center justify-center rounded-md text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-background has-checked:text-foreground has-checked:shadow-sm has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
+          className="flex h-9 cursor-pointer items-center justify-center rounded-full text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-card has-checked:text-foreground has-checked:shadow-panel has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
         >
           <input type="radio" value={value} className="sr-only" {...field} />
           {KIND_LABELS[value]}

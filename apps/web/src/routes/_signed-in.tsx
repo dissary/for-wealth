@@ -27,10 +27,11 @@ function SignedInLayout() {
     <div className="flex min-h-svh flex-col">
       {/* From sm up, one row: the app name, the pages and the user's name. A
           phone keeps a slim bar with the app name and the user's name, and
-          moves the pages to a tab bar at the foot of the screen. */}
-      <header className="border-b bg-card pt-[env(safe-area-inset-top)]">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-x-4 px-4 sm:gap-x-8 sm:px-6">
-          <Wordmark className="flex h-12 items-center font-heading text-lg font-semibold tracking-tight sm:h-14" />
+          moves the pages to a tab bar at the foot of the screen. It sits on
+          the page itself, with no bar of its own. */}
+      <header className="pt-[env(safe-area-inset-top)]">
+        <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-x-4 px-4 sm:h-18 sm:gap-x-8 sm:px-6">
+          <Wordmark />
           <HeaderNav className="hidden flex-1 sm:flex" />
           <UserMenu me={me} />
         </div>

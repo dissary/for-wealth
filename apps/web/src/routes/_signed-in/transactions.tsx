@@ -22,6 +22,7 @@ import { BudgetStanding } from '@/components/budget-standing'
 import { FloatingAddButton } from '@/components/floating-add-button'
 import { EstimateLabel, RecurringMark } from '@/components/markers'
 import { PageTitle } from '@/components/page-title'
+import { EmptyPanel, PageHeading, PANEL } from '@/components/panel'
 import { ROW_DETAIL, ROW_NAME, RowButton } from '@/components/row-button'
 import { Total } from '@/components/total'
 import { TransactionDialog } from '@/components/transaction-dialog'
@@ -70,22 +71,20 @@ function TransactionsPage() {
   const bounds = { earliest: EARLIEST_DATE, latest: addYears(today, 1) }
 
   return (
-    // A reading column under the wider header: each row is just a Category
-    // and an amount, too far apart across the Dashboard's full width.
-    <main className="flex max-w-3xl flex-col gap-6 py-8 sm:py-12">
+    // A reading column, centred under the wider header: each row is just a
+    // Category and an amount, too far apart across the Dashboard's full width.
+    <main className="mx-auto flex w-full max-w-3xl flex-col gap-5 pt-4 pb-8 sm:gap-6 sm:pt-6 sm:pb-12">
       <PageTitle>Transactions</PageTitle>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
-          {formatPeriodLabel(period, date)}
-        </h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <PageHeading>{formatPeriodLabel(period, date)}</PageHeading>
         <Button size="lg" onClick={add}>
           <PlusIcon aria-hidden="true" />
           Add Transaction
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-        <nav aria-label="Periods" className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <nav aria-label="Periods" className="flex items-center gap-1.5">
           <StepLink period={period} to={stepPeriod(period, date, -1, bounds)} direction={-1} />
           <StepLink period={period} to={stepPeriod(period, date, 1, bounds)} direction={1} />
           {/* Off only on today itself: a Week or Month holding today may be
@@ -175,14 +174,14 @@ function StepLink({ period, to, direction }: { period: Period; to: CalendarDate 
 // Day, Week or Month. Switching keeps the date, so the new Period holds it.
 function PeriodSwitch({ period }: { period: Period }) {
   return (
-    <nav aria-label="Period" className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1">
+    <nav aria-label="Period" className="grid grid-cols-3 gap-1 rounded-full bg-muted p-1">
       {(Object.keys(PERIOD_LABELS) as Period[]).map((value) => (
         <Link
           key={value}
           from={Route.fullPath}
           search={(prev) => ({ ...prev, period: value })}
           aria-current={value === period ? 'page' : undefined}
-          className="flex h-7 items-center justify-center rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors outline-none select-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 aria-[current=page]:bg-background aria-[current=page]:text-foreground aria-[current=page]:shadow-sm"
+          className="flex h-7 items-center justify-center rounded-full px-3.5 text-sm font-medium text-muted-foreground transition-colors outline-none select-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 aria-[current=page]:bg-card aria-[current=page]:text-foreground aria-[current=page]:shadow-panel"
         >
           {PERIOD_LABELS[value]}
         </Link>
@@ -209,6 +208,7 @@ function CategoryFilter({ category, filtered }: { category: string | undefined; 
       </label>
       <NativeSelect
         id="category-filter"
+        size="sm"
         className="min-w-0"
         value={category ?? ''}
         disabled={!categories.data}
@@ -270,9 +270,9 @@ function PeriodView({
       {/* No net figure, so nothing competes with Remaining (v1-spec). The
           labels say which is which, so neither total has a sign. With a
           filter on, they cover only that Category. */}
-      <dl className="flex gap-10">
-        <Total label="Income" amount={formatAmount(listing.totals.income, currency)} />
-        <Total label="Expenses" amount={formatAmount(listing.totals.expense, currency)} />
+      <dl className={`${PANEL} grid grid-cols-2 gap-x-6`}>
+        <Total size="large" label="Income" amount={formatAmount(listing.totals.income, currency)} />
+        <Total size="large" label="Expenses" amount={formatAmount(listing.totals.expense, currency)} />
       </dl>
 
       {/* A Month filtered to an Expense Category with a Budget: the API only
@@ -282,9 +282,9 @@ function PeriodView({
       {listing.budget !== null && (
         <section
           aria-labelledby="budget"
-          className="grid max-w-md grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-2"
+          className={`${PANEL} grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-2`}
         >
-          <h2 id="budget" className="text-sm text-muted-foreground">
+          <h2 id="budget" className="font-sans text-sm text-muted-foreground">
             Budget
           </h2>
           <span className="text-right font-medium tabular-nums">{formatAmount(listing.totals.expense, currency)}</span>
@@ -299,22 +299,22 @@ function PeriodView({
       )}
 
       {listing.transactions.length === 0 ? (
-        <div className="flex flex-col items-start gap-3 border-t pt-6">
+        <EmptyPanel>
           <p className="text-muted-foreground">
             Nothing recorded{where} for this {PERIOD_LABELS[listing.period].toLowerCase()}.
           </p>
           <Button variant="outline" onClick={onAdd}>
             Add a Transaction
           </Button>
-        </div>
+        </EmptyPanel>
       ) : listing.period === 'day' ? (
         // The heading already names the day.
         <TransactionList transactions={listing.transactions} currency={currency} onEdit={onEdit} />
       ) : (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-5">
           {byDate(listing.transactions).map(([date, transactions]) => (
             <section key={date} aria-labelledby={`day-${date}`}>
-              <h2 id={`day-${date}`} className="pb-2 text-sm font-medium text-muted-foreground">
+              <h2 id={`day-${date}`} className="px-1 pb-2 font-sans text-sm font-medium text-muted-foreground">
                 {formatDayLabel(date)}
               </h2>
               <TransactionList transactions={transactions} currency={currency} onEdit={onEdit} />
@@ -349,7 +349,7 @@ function TransactionList({
   onEdit: (transaction: Transaction) => void
 }) {
   return (
-    <ul aria-label="Transactions" className="divide-y border-t">
+    <ul aria-label="Transactions" className={`${PANEL} divide-y py-1.5 sm:py-2`}>
       {transactions.map((transaction) => (
         <li key={transaction.id}>
           <RowButton onClick={() => onEdit(transaction)}>

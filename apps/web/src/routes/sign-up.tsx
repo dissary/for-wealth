@@ -80,7 +80,7 @@ function SignUpForm({ onSent }: { onSent: (email: string) => void }) {
 
   return (
     <section aria-labelledby="sign-up-heading" className="flex flex-col gap-6">
-      <h2 id="sign-up-heading" className="text-2xl font-semibold">
+      <h2 id="sign-up-heading" className="text-2xl font-semibold tracking-tight">
         Create your account
       </h2>
       <form noValidate onSubmit={form.handleSubmit(onSubmit)}>
@@ -177,7 +177,7 @@ function SignUpForm({ onSent }: { onSent: (email: string) => void }) {
 function CheckYourEmail({ email }: { email: string }) {
   return (
     <section aria-labelledby="check-email-heading" className="flex flex-col gap-3" role="status">
-      <h2 id="check-email-heading" className="text-2xl font-semibold">
+      <h2 id="check-email-heading" className="text-2xl font-semibold tracking-tight">
         Check your email
       </h2>
       {/* The same words whether or not the email already has an account, as

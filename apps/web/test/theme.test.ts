@@ -42,6 +42,8 @@ const TEXT_PAIRS: [string, string][] = [
   ['over-budget', 'card'],
   ['under-budget', 'background'],
   ['under-budget', 'card'],
+  ['hero-foreground', 'hero'],
+  ['hero-muted', 'hero'],
   ['sidebar-foreground', 'sidebar'],
   ['sidebar-primary', 'sidebar'],
   ['sidebar-primary-foreground', 'sidebar-primary'],

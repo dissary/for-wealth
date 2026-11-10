@@ -22,7 +22,7 @@ export function RowButton({ className, ...props }: ComponentProps<'button'>) {
       aria-haspopup="dialog"
       className={cn(
         ROW,
-        '-mx-2 w-[calc(100%+1rem)] rounded-md px-2 py-3 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50',
+        '-mx-3 w-[calc(100%+1.5rem)] rounded-xl px-3 py-3.5 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50',
         className,
       )}
       {...props}

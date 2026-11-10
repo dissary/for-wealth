@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 // Budgets.
 function Tag({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex h-5 items-center rounded-sm border px-1.5 text-xs font-medium text-muted-foreground">
+    <span className="inline-flex h-5 items-center rounded-full bg-accent px-2 text-xs font-medium text-accent-foreground">
       {children}
     </span>
   )

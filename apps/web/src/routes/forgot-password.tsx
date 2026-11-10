@@ -13,7 +13,7 @@ function ForgotPassword() {
       <PageTitle>Reset your password</PageTitle>
       <section aria-labelledby="forgot-password-heading" className="flex flex-col gap-6">
         <div className="flex flex-col gap-2">
-          <h2 id="forgot-password-heading" className="text-2xl font-semibold">
+          <h2 id="forgot-password-heading" className="text-2xl font-semibold tracking-tight">
             Reset your password
           </h2>
           <p className="text-sm">

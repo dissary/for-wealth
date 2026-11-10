@@ -7,9 +7,9 @@ import { cn } from '@/lib/utils'
 // worked out from, in a <dl>. The label says which is which, so the amount
 // carries no sign. A detail under the amount says more about it. Given a view, the total opens
 // those Transactions: the amount is the link, named "Income RM3,000.00", and
-// the whole figure, label too, can be clicked. Large, it's set in the narrow
-// heading cut, smaller on a phone so a six-figure total fits its half-width
-// column; one longer still wraps rather than scrolling the page.
+// the whole figure, label too, can be clicked. Large, it's smaller on a phone
+// so a six-figure total fits its half-width column; one longer still wraps
+// rather than scrolling the page.
 export function Total({
   label,
   amount,
@@ -29,7 +29,7 @@ export function Total({
       className={cn(
         'flex flex-col gap-0.5',
         view &&
-          'relative -mx-2 -my-1 rounded-md px-2 py-1 transition-colors hover:bg-muted has-focus-visible:ring-3 has-focus-visible:ring-ring/50',
+          'relative -mx-2 -my-1 rounded-lg px-2 py-1 transition-colors hover:bg-muted has-focus-visible:ring-3 has-focus-visible:ring-ring/50',
       )}
     >
       <dt id={`${id}-label`} className="text-sm text-muted-foreground">
@@ -37,8 +37,8 @@ export function Total({
       </dt>
       <dd
         className={cn(
-          'text-xl font-medium tabular-nums',
-          size === 'large' && 'font-heading text-2xl font-semibold tracking-tight wrap-anywhere sm:text-3xl lg:text-4xl',
+          'text-xl font-semibold tracking-tight tabular-nums wrap-anywhere',
+          size === 'large' && 'text-2xl sm:text-3xl',
         )}
       >
         {view ? (
