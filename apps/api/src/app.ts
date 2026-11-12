@@ -11,6 +11,7 @@ import { health } from './routes/health.js'
 import { me } from './routes/me.js'
 import { recurring } from './routes/recurring.js'
 import { transactions } from './routes/transactions.js'
+import { trends } from './routes/trends.js'
 import { holdToResponseFloor } from './response-floor.js'
 
 // Built apart from the server in index.ts, so tests can call app.request()
@@ -43,6 +44,7 @@ const app = new Hono()
   .route('/dashboard', dashboard)
   .route('/budgets', budgets)
   .route('/recurring', recurring)
+  .route('/trends', trends)
 
 export type AppType = typeof app
 export default app

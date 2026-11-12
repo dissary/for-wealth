@@ -15,6 +15,7 @@ The author is the first user. Once the foundation works, it goes to friends and 
 - Monthly **Budgets** per Expense Category, with progress bars.
 - **Recurring Transactions** (monthly, weekly, yearly) that create real Transactions on their due dates. Variable bills create an **Estimate** to confirm later.
 - Dashboard: this month's **Expected Income**, Expenses, **Commitments**, **Free to Spend**, **Remaining** (and per-day for the rest of the month), Budget progress, upcoming recurring items, Estimates to confirm.
+- Trends: Income and Expenses for each month across 12 months, with **Net**, and one Category over time with its Budget (slice 6b).
 - Settings: Categories, name, password, currency (chosen at signup, shown read-only), time zone.
 - Delete your account and all its data (slice 7, before inviting friends).
 - Desktop-first layout that also works in a phone browser.
@@ -24,7 +25,7 @@ The author is the first user. Once the foundation works, it goes to friends and 
 | Feature | When |
 |---|---|
 | CSV import from bank statements | v2 |
-| Spending trend charts, Category pie charts | v1.1 |
+| Category pie charts | dropped on 2026-11-12: Expenses by Category already gives each share; trend charts moved into v1 as Trends |
 | CSV export of your data | v1.1 |
 | Savings goals | later |
 | Pay-cycle months (e.g. the 25th to the 24th) | later setting |
@@ -99,7 +100,7 @@ Decided on 2026-10-24, for slice 3. Slices 4 and 5 add Budgets, Free to Spend, R
 - No net figure, Free to Spend, Remaining or per-day figure until slice 5 (see "The Dashboard in slice 5"). Before Recurring Transactions exist, Remaining would be Income recorded minus Expenses, which is negative every month until the salary is recorded; in slice 5, Expected Income counts recurring Income still due, so the figures arrive together then.
 - **Expenses by Category**: one row per Expense Category with Expenses that month, showing its name, its total and its share of the month's Expenses ("Food RM820.00 · 34%"). Largest total first; equal totals fall back to the Category's position. Categories with no Expenses that month are left out (from slice 4, unless they have a Budget that month). An archived Category with Expenses that month is listed as "Food (archived)".
 - Shares are whole percentages. A share under 1% shows "<1%", never "0%". Rounded shares may not add up to 100%, and nothing adjusts them.
-- No bars in slice 3. In slice 4, each row gains its Budget limit and a progress bar, so a bar always means Budget progress.
+- No bars in slice 3. In slice 4, each row gains its Budget limit and a progress bar, so a horizontal bar on a row always means Budget progress. (Narrowed on 2026-11-12 from "a bar", so the Trends chart's columns are allowed.)
 - From slice 4: a Category with a Budget that month has a row even with no Expenses, showing RM0.00 spent and no share. Budgeted rows show their Budget as set out under Budgets. Each entry in `expenseCategories` gains `budget` (the month's limit, or `null`), and a Category with a Budget but no Expenses comes back with `total: 0`. There is still no total of all Budgets beside the Income and Expense totals; that comes with Free to Spend in slice 5.
 - A row opens the Transactions page on that Month, filtered to that Category (`/transactions?period=month&date=2026-10-01&category=<id>`). The Income and Expense totals open that Month with no filter.
 - The month lives in the address bar (`/?month=2026-10`). ‹ › step one calendar month, and a "This month" button removes `month`. The bounds are the months holding 2000-01-01 and one year after today. An invalid or out-of-bounds `month` is dropped and the page shows this month. With no `month`, the page shows this month in the user's time zone and moves on at midnight on the 1st.
@@ -219,7 +220,7 @@ Decided on 2026-10-31, for slice 6.
 
 Decided on 2026-10-31, for slice 6. Desktop is unchanged.
 
-- Below `sm`, a bottom tab bar holds Dashboard · Transactions · Recurring, clear of the phone's home indicator (safe-area insets). A slim top bar keeps the app name and the user menu.
+- Below `sm`, a bottom tab bar holds Dashboard · Transactions · Trends · Recurring (Trends added in slice 6b), clear of the phone's home indicator (safe-area insets). A slim top bar keeps the app name and the user menu.
 - A floating Add Transaction button sits above the tab bar on every signed-in page except Settings. It opens the Add dialog (a sheet on a phone) dated today, or, on the Transactions page, on the Day being viewed, as the page's own button does. The Dashboard's month doesn't change the date. On desktop each page's own Add button is enough, so there is no floating button.
 - Every signed-in page and dialog works at 360 px wide with no sideways scrolling. Tab bar and Add button targets are at least 44 px. Rows that don't fit (Transactions, Upcoming, Recurring) put the amount under the name rather than shrinking the text.
 - The PR carries phone and desktop screenshots, light and dark.
@@ -230,9 +231,34 @@ Decided on 2026-10-31, for slice 6.
 
 - **Budget on the Transactions page**: a Month filtered to an Expense Category with a Budget that month shows a Budget strip under the totals: limit, bar, "RM420.00 left" or "Overspent by RM40.00", and for this month the per-day figure, exactly as the Dashboard's row and with the same shared maths. Day and Week, an unfiltered Month, and an Income filter show none. `GET /api/transactions` gains `budget` (the month's limit, or `null`) when `period` is `month` and the filter is an Expense Category, archived ones included, so a past month of an archived Category shows its Budget.
 - **Not found**: an unknown address shows a "Page not found" page with a link to the Dashboard.
-- **Page titles**: each page sets its tab title: "Dashboard · For Wealth", "Transactions · For Wealth", "Recurring · For Wealth", "Settings · For Wealth", "Sign in · For Wealth", and so on.
+- **Page titles**: each page sets its tab title: "Dashboard · For Wealth", "Transactions · For Wealth", "Trends · For Wealth", "Recurring · For Wealth", "Settings · For Wealth", "Sign in · For Wealth", and so on.
 - **Errors**: when a page's data can't be loaded (no connection, or the API fails), the page says so in words with a Try again button, instead of staying blank. A session that has ended sends the user to sign in, back to the same page after.
 - **Empty states**: every list that can be empty says what goes there and offers the action that fills it: a Period with no Transactions, no Recurring Transactions, a Dashboard month with nothing recorded.
+
+### Trends
+
+Decided on 2026-11-12, for slice 6b, built before the first deploy. The look was settled with a prototype (variant A, "Columns") kept on the `prototype/trends-charts` branch.
+
+- **The page**: `/trends`, titled "Trends · For Wealth". Its link sits between Transactions and Recurring, in the header and the phone's tab bar. It has its own Add Transaction button and, on a phone, the floating one, both dated today; saving refreshes the page.
+- **What it shows**: one row of months, oldest on the left, each month's Income and Expenses as a pair of columns. Above the chart, three figures for the months shown: Income, Expenses and **Net** ("+RM4,200.00", or "−RM300.00" in ink, never red).
+- **The window**: the 12 months ending with `to` (`/trends?to=2026-11`). Without `to` it ends with this month in the user's time zone and moves on at midnight on the 1st. The months before the month of the user's first Transaction are left out, so the window is shorter until a year of data exists. With no Transactions at all, the page says "Nothing recorded yet" and offers Add Transaction.
+- **‹ ›** step a whole year (12 months). › stops at this month: a window never ends after it, and › from a window ending within the last 12 months lands on this month. ‹ is off when the window already starts at the month of the first Transaction. A `to` that isn't a month, is after this month or is before January 2000 is dropped from the address, as on the Dashboard.
+- **How a month is counted**: every Transaction dated in it, including ones dated later this month, as the Dashboard totals do. No forecasting: Upcoming Due Dates aren't counted. This month is labelled "so far" under its name and its columns are drawn lighter.
+- **The chart**: Income in plum, Expenses in a warm grey, with a legend. Gridlines at zero, half and the top, labelled in whole currency units ("6k"). Hovering or focusing a month shows its Income, Expenses and Net. Clicking a month, or Enter on it, opens that month's Dashboard (`/?month=2026-10`). On a touch screen, the first tap shows the month's figures with an "Open October 2026" link, and the second tap opens it. Each month is a link whose accessible name reads out its figures.
+- **One Category**: a Category picker above the chart, kept in the address bar (`?category=<id>`), offers "All Categories", then every Category that isn't archived (Expense, then Income), then archived ones as "Food (archived)". A Category the user doesn't have shows "That Category isn't available", as the Transactions page does. With a Category picked:
+  - The chart is one column per month of that Category's total, over the same window.
+  - An Expense Category shows each month's Budget limit (the limit that carried forward to it) as a dashed mark across that month. A month over its limit is drawn in the `over-budget` red and is Overspent. Its tooltip reads "RM120.00 left" or "Overspent by RM40.00". Income Categories have no Budget mark.
+  - The three figures become: the total for the months shown, the average a month, and, for an Expense Category, "Months Overspent: 2 of 9", counting months with a Budget and leaving this month out.
+  - Net isn't shown.
+  - Clicking a month opens the Transactions page on that Month, filtered to the Category.
+- **The phone**: 12 pairs of columns fit at 360 px with no sideways scroll. The figures go two to a row.
+- **Drawn without a chart library**: the columns are plain elements sized from the figures, so they take the theme's tokens like every other component. Amounts on the axis use the currency's own decimal places.
+- `GET /api/trends?to=YYYY-MM[&category=<id>]` sums the months in Postgres, scoped to the user. `to` is required. A malformed `to`, one after this month in the user's time zone or before January 2000, a `category` that isn't an ID, or any other parameter gives 400. Another user's or an unknown Category gives 404; an archived one of the user's is allowed. It answers `{ to, first, months }`:
+  - `first` is the month of the user's earliest Transaction, or `null`.
+  - `months` is every month from the later of (`to` − 11 months) and `first`, up to `to`, oldest first, each `{ month, income, expense }`. Months with nothing recorded are included at 0. It is empty when `first` is `null` or after `to`.
+  - With `category`, the answer also has `category: { id, name, kind, archived }`, and each month is `{ month, total, budget }`, where `budget` is that month's limit, or `null` (always `null` for an Income Category).
+- The query sits under the Transactions' cache key, so adding, editing or deleting a Transaction refreshes it, and saving Budgets refreshes it too.
+- Design: build it with the `frontend-design` and `dataviz` skills, within the theme. The PR carries phone and desktop screenshots, light and dark.
 
 ## Architecture
 
@@ -337,6 +363,7 @@ Before inviting friends (slice 7):
 - Slice 4 tests: in `packages/shared`, how a limit carries forward (a change, a later change, a removal, a change to an earlier month), the per-day figure (rounding down, the last day of the month), and the bar's fill, Overspent included. Against the API: a month's limits come from the stored changes; editing November leaves October unchanged and reaches December; saving the same limit stores nothing; limits outside the bounds or with too many decimal places are refused; an archived, Income or other user's Category gives 404; a Category listed twice gives 400; a malformed, missing or out-of-bounds `month` and any other parameter give 400; a budgeted Category with no Expenses appears on the Dashboard; another user's Budgets never appear; the database refuses a Budget on another user's Category; the 61st write in a minute is refused.
 - Slice 5 tests: in `packages/shared`, Due Dates for each schedule (day 31, 29 Feb, weekdays, across years), the first Due Date from a start date, the next Due Date after a schedule change, the month's plan (Expected Income, Commitments, Free to Spend, Remaining), and the Budgets warning. Against the API: catching up creates each missed Due Date once, dated on it, and a deleted one is never recreated; two loads at once create each once; an Estimate is created when the amount varies and saving it confirms it; editing changes only later Transactions, and a schedule change never doubles a period; a stopped one creates nothing more and leaves Upcoming; the month's figures, Upcoming and the warning; the start date's bounds; the 101st is refused; another user's Recurring Transaction gives 404 for edit and stop, never appears, and the database refuses a Transaction linked to it.
 - Slice 6 tests. Against the API: adding, renaming, archiving, restoring and moving Categories; names trimmed, too long or empty refused, a clash in the same kind refused ignoring case, archived ones included, while the same name in the other kind is allowed; the 51st Category of a kind refused, for adding and for restoring; archiving the last Category of a kind refused; archiving with a Recurring Transaction that isn't stopped refused, and a stopped one doesn't block it; archiving ends the Budget from this month in the user's time zone, removes later changes, leaves earlier months' limits on the Dashboard as archived rows and in the Budgets warning; restoring brings no Budget back and puts the Category last; renaming or moving an archived Category gives 404; moving the first up or the last down changes nothing, and two moves at once leave a clean order; another user's Category gives 404 for every endpoint; the write limit applies; a filtered Month of the Transactions page answers the Category's `budget`; changing the time zone moves today and the next catch-up; changing the password refuses a wrong current password and a breached new one, keeps this session and signs out the others.
+- Slice 6b (Trends) tests. In `packages/shared`: the window's months from `to` and `first` (a full year, a short first year, no Transactions, `first` after `to`, across a new year), where ‹ and › land and when each is off, and which `to` values are allowed in the user's time zone. Against the API: each month's Income and Expense totals; months before the first Transaction left out and empty months in the window at 0; Transactions dated later this month counted; one Category's totals with each month's carried-forward limit, a limit changed mid-window, an archived Category, and `budget` always `null` for Income; a malformed, missing, future or too-early `to`, a malformed `category` and any other parameter give 400; another user's Category gives 404; another user's Transactions never appear in any total or in `first`. In `apps/web/test`: the two chart tokens are at least 3:1 against the panel in both modes.
 - API tests use a separate `for_wealth_test` database (`TEST_DATABASE_URL`), run one file at a time (`fileParallelism: false`) and empty the tables between tests. A test signs in by signing up, marking the email verified in the database, then signing in.
 - Slice 1 auth tests: no session gives 401, sign-in before verifying gives 403, a verified sign-in works, currency can't be changed, a breached or short password is rejected, a cross-site POST is rejected, the verification email is sent, a signed-out session's cookie gives 401, a session in use is extended, and two users each see only their own details. Password reset: an unknown email gets the same answer as a known one, a valid link resets the password and the new one signs in while the old one doesn't, a session from before the reset gets 401, a used, expired or earlier link is refused, a weak new password is refused, and a failure while saving the password changes nothing.
 
@@ -350,6 +377,7 @@ Each slice works all the way from the database to the screen.
 4. Budgets (limits carry forward), progress bars, Overspent.
 5. Recurring Transactions, Estimates, Commitments, Expected Income, Free to Spend, Remaining, Upcoming, and the warning when Budgets don't fit Expected Income.
 6. Settings, polish, phone layout.
+6b. Trends: Income and Expenses per month, Net, one Category over time with its Budget. Moved ahead of the first deploy on 2026-11-12.
 7. **First deploy**: hosting, managed Postgres, Resend, domain (optional), the "Before inviting friends" list under Hosting, delete account included. **Then invite friends.**
 
 ## Design
@@ -363,6 +391,7 @@ The theme lives as tokens in `apps/web/src/index.css`. Components use the tokens
 - **Red and green**: the `over-budget` and `under-budget` tokens only. So `destructive` (delete buttons, invalid fields) is ink, not red: the wording ("Delete Transaction") and a confirmation step carry the warning, which also works for people who can't tell red from green. For the same reason, an invalid form field always says what's wrong in words, not only with its border.
 - **Panels**: content sits on panels (`components/panel.tsx`) with soft corners and a faint shadow tinted with the accent. The Dashboard's Remaining panel is the one filled surface (the `hero` tokens), and shows the month as a row of days up to today.
 - **Type**: Figtree for text and amounts, Bricolage Grotesque for headings, both bundled from npm. All digits are tabular (the same width), so amounts line up.
+- **Chart colours**: Trends draws Income in plum and Expenses in a warm grey, each its own token, with the `over-budget` red only for an Overspent month. Each is at least 3:1 against the panel in both modes.
 - **Corners**: 0.75rem base radius. Buttons and switches are pills, panels use a larger radius, and the Remaining panel the largest.
 - **Light and dark**: follows the device setting, in CSS only. A manual switch can come later if wanted.
 - **Checked by tests** (`apps/web/test/`): text contrast meets WCAG AA in both modes, red and green appear only in the Budget tokens, components hard-code no colours, the stylesheet loads nothing from another address, and transitions and animations stop when the device asks for reduced motion.

@@ -34,6 +34,10 @@ _Avoid_: Draft, pending, placeholder
 A label that groups Transactions by purpose, such as Food, Transport, or Rent. A Category that is no longer wanted is archived, never deleted, so past Transactions keep it; an archived Category can be restored. Every Category is either an Income Category or an Expense Category.
 _Avoid_: Tag, type, bucket
 
+**Net**:
+Income minus Expenses over one or more months, counting the Transactions dated in them. It is negative when Expenses are larger. It says nothing about where the money went; moving money to savings is not an Expense, so it doesn't change Net.
+_Avoid_: Saved, savings, profit, balance, kept
+
 ### Planning
 
 **Budget**:
