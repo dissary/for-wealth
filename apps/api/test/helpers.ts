@@ -231,3 +231,10 @@ export function restoreCategory(cookie: string | undefined, id: string) {
     headers: { origin: APP_ORIGIN, ...(cookie ? { cookie } : {}) },
   })
 }
+
+// Income and Expenses per month, for a query such as { to: '2026-10' }.
+export function getTrends(cookie: string | undefined, query: Record<string, string>) {
+  return app.request(`/api/trends?${new URLSearchParams(query)}`, {
+    headers: cookie ? { cookie } : {},
+  })
+}

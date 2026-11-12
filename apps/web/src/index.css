@@ -16,6 +16,8 @@
     --font-heading: 'Bricolage Grotesque Variable', 'Figtree Variable', ui-sans-serif, system-ui, sans-serif;
     --color-over-budget: var(--over-budget);
     --color-under-budget: var(--under-budget);
+    --color-chart-income: var(--chart-income);
+    --color-chart-expense: var(--chart-expense);
     --color-hero: var(--hero);
     --color-hero-foreground: var(--hero-foreground);
     --color-hero-muted: var(--hero-muted);
@@ -79,6 +81,9 @@
      destructive is ink, not red: the action's wording and a confirmation step
      carry the warning.
    - hero is the Dashboard's Remaining panel, the one filled surface.
+   - chart-income and chart-expense are Trends' two series: plum, and a warm
+     grey that is a neutral, not a second hue. Each is at least 3:1 against
+     the panel, and they differ in lightness as well as hue.
    - test/theme.test.ts checks text contrast (WCAG AA) and these colour rules
      in both modes. */
 :root {
@@ -109,6 +114,8 @@
     --hero-foreground: oklch(0.985 0.006 80);
     --hero-muted: oklch(0.87 0.045 305);
     --shade: oklch(0.3 0.05 305);
+    --chart-income: oklch(0.52 0.14 305);
+    --chart-expense: oklch(0.63 0.025 80);
     --chart-1: oklch(0.82 0.06 305);
     --chart-2: oklch(0.7 0.1 305);
     --chart-3: oklch(0.58 0.13 305);
@@ -153,6 +160,8 @@
         --hero-foreground: oklch(0.97 0.008 80);
         --hero-muted: oklch(0.84 0.05 305);
         --shade: oklch(0 0 0);
+        --chart-income: oklch(0.74 0.11 305);
+        --chart-expense: oklch(0.56 0.022 80);
         --chart-1: oklch(0.87 0.05 305);
         --chart-2: oklch(0.77 0.09 305);
         --chart-3: oklch(0.66 0.12 305);

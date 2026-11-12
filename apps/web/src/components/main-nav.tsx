@@ -1,8 +1,8 @@
 import { Link, linkOptions } from '@tanstack/react-router'
-import { ReceiptTextIcon, RepeatIcon, WalletIcon } from 'lucide-react'
+import { ChartColumnIcon, ReceiptTextIcon, RepeatIcon, WalletIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-// The three pages every signed-in user moves between: in the header from sm
+// The four pages every signed-in user moves between: in the header from sm
 // up, and in a tab bar at the foot of a phone's screen (v1-spec "The phone
 // layout").
 const PAGES = [
@@ -18,6 +18,7 @@ const PAGES = [
     // Active on any Period or filter of the page, not only the bare path.
     link: linkOptions({ to: '/transactions', activeOptions: { includeSearch: false } }),
   },
+  { label: 'Trends', icon: ChartColumnIcon, link: linkOptions({ to: '/trends' }) },
   // The mark a Transaction from a Recurring Transaction carries.
   { label: 'Recurring', icon: RepeatIcon, link: linkOptions({ to: '/recurring' }) },
 ]
@@ -40,7 +41,8 @@ export function HeaderNav({ className }: { className?: string }) {
 }
 
 // The current tab's icon sits on a tinted pill. Each tab is the bar's full
-// height, well over 44 px, and the bar clears the home indicator.
+// height and a quarter of its width, over 44 px each way even at 360 px, and
+// the bar clears the home indicator.
 const TAB =
   'group flex h-16 flex-col items-center justify-center gap-0.5 text-xs text-muted-foreground transition-colors outline-none aria-[current=page]:font-semibold aria-[current=page]:text-foreground'
 const TAB_ICON =
@@ -55,7 +57,7 @@ export function TabBar({ className }: { className?: string }) {
         className,
       )}
     >
-      <div className="grid grid-cols-3">
+      <div className="grid grid-cols-4">
         {PAGES.map(({ label, icon: Icon, link }) => (
           <Link key={label} {...link} className={TAB}>
             <span className={TAB_ICON}>

@@ -50,6 +50,10 @@ const TEXT_PAIRS: [string, string][] = [
   ['sidebar-accent-foreground', 'sidebar-accent'],
 ]
 
+// Marks that carry data on a panel: Trends' columns (v1-spec "Design"). As
+// non-text graphics they need 3:1 against the panel (WCAG 1.4.11).
+const CHART_MARKS = ['chart-income', 'chart-expense']
+
 // Below this chroma a colour reads as a tinted neutral rather than a hue.
 const NEUTRAL_CHROMA = 0.04
 
@@ -89,6 +93,13 @@ describe.each<Mode>(['light', 'dark'])('%s mode', (mode) => {
       .map(([name]) => name)
     // Every other coloured token is the one accent colour.
     expect(offAccent).toEqual([])
+  })
+
+  it.each(CHART_MARKS)('--%s is at least 3:1 against the panel', (mark) => {
+    const fg = colours.get(mark)
+    expect(fg, `--${mark} is not defined`).toBeDefined()
+    expect(fg!.alpha).toBe(1)
+    expect(contrastRatio(fg!, colours.get('card')!)).toBeGreaterThanOrEqual(3)
   })
 
   it.each(TEXT_PAIRS)('%s on %s meets WCAG AA', (text, background) => {
