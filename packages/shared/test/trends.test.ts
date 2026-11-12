@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  categoryTrendsFigures,
   formatNet,
   formatTrendsWindow,
   stepTrendsWindow,
@@ -208,5 +209,45 @@ describe('trendsScale', () => {
   it('still has a scale for tiny amounts and for nothing at all', () => {
     expect(labels(50)).toEqual(['0', '1', '2'])
     expect(labels(0)).toEqual(['0', '1', '2'])
+  })
+})
+
+describe('categoryTrendsFigures', () => {
+  it('totals the months shown and averages them, rounded to a whole minor unit', () => {
+    const figures = categoryTrendsFigures(
+      [
+        { month: '2026-09', total: 10_000, budget: null },
+        { month: '2026-10', total: 0, budget: null },
+        { month: '2026-11', total: 5_001, budget: null },
+      ],
+      '2026-11',
+    )
+
+    expect(figures.total).toBe(15_001)
+    expect(figures.average).toBe(5_000)
+  })
+
+  it('counts the months over their Budget among the months with one, leaving this month out', () => {
+    const figures = categoryTrendsFigures(
+      [
+        // No Budget: never Overspent, and not counted.
+        { month: '2026-07', total: 90_000, budget: null },
+        { month: '2026-08', total: 50_001, budget: 50_000 },
+        // Spending exactly the limit isn't Overspent.
+        { month: '2026-09', total: 50_000, budget: 50_000 },
+        { month: '2026-10', total: 70_000, budget: 60_000 },
+        // This month is still filling.
+        { month: '2026-11', total: 99_000, budget: 60_000 },
+      ],
+      '2026-11',
+    )
+
+    expect(figures.overspent).toEqual({ months: 2, of: 3 })
+  })
+
+  it('counts a past window’s last month', () => {
+    const figures = categoryTrendsFigures([{ month: '2025-11', total: 2, budget: 1 }], '2026-11')
+
+    expect(figures.overspent).toEqual({ months: 1, of: 1 })
   })
 })
