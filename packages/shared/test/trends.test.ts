@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { formatNet, trendsMonths, trendsScale, trendsToSchema } from '../src/index.js'
+import {
+  formatNet,
+  formatTrendsWindow,
+  stepTrendsWindow,
+  trendsMonths,
+  trendsScale,
+  trendsToSchema,
+} from '../src/index.js'
 
 describe('trendsMonths', () => {
   it('is the 12 months ending with `to`, oldest first, across a new year', () => {
@@ -38,6 +45,77 @@ describe('trendsMonths', () => {
 
   it('is empty when the first Transaction is after `to`', () => {
     expect(trendsMonths('2026-11', '2026-12')).toEqual([])
+  })
+})
+
+describe('stepTrendsWindow', () => {
+  const step = (to: string, direction: -1 | 1, first: string | null = '2020-06', thisMonth = '2026-11') =>
+    stepTrendsWindow(to, direction, { first, thisMonth })
+
+  describe('‹', () => {
+    it('steps back a whole year, across a new year', () => {
+      expect(step('2026-03', -1)).toBe('2025-03')
+    })
+
+    it('steps back into a short first year', () => {
+      // The window ends Nov 2026 and starts Dec 2025; the first Transaction
+      // is in Jul 2025, so the year before shows Jul to Nov 2025.
+      expect(step('2026-11', -1, '2025-07')).toBe('2025-11')
+      // The first Transaction in the month just before the window.
+      expect(step('2026-11', -1, '2025-11')).toBe('2025-11')
+    })
+
+    it('is off when the window already starts at the first Transaction’s month', () => {
+      // A short first year: the window is Sep to Nov 2026.
+      expect(step('2026-11', -1, '2026-09')).toBeNull()
+      // A first year that's exactly full: Dec 2025 to Nov 2026.
+      expect(step('2026-11', -1, '2025-12')).toBeNull()
+    })
+
+    it('is off with no Transactions', () => {
+      expect(step('2026-11', -1, null)).toBeNull()
+    })
+
+    it('is off for a window ending before the first Transaction', () => {
+      expect(step('2010-01', -1, '2020-06')).toBeNull()
+    })
+  })
+
+  describe('›', () => {
+    it('steps forward a whole year, across a new year', () => {
+      expect(step('2024-12', 1)).toBe('2025-12')
+    })
+
+    it('lands exactly on this month a year on', () => {
+      expect(step('2025-11', 1)).toBe('2026-11')
+    })
+
+    it('stops at this month from a window ending within the last 12 months', () => {
+      expect(step('2025-12', 1)).toBe('2026-11')
+      expect(step('2026-10', 1)).toBe('2026-11')
+    })
+
+    it('is off when the window already ends this month', () => {
+      expect(step('2026-11', 1)).toBeNull()
+    })
+
+    it('stops at this month across a new year', () => {
+      expect(step('2026-06', 1, '2020-06', '2027-01')).toBe('2027-01')
+    })
+  })
+})
+
+describe('formatTrendsWindow', () => {
+  it('names the first and last months shown', () => {
+    expect(formatTrendsWindow(trendsMonths('2026-11', '2020-06'))).toBe('Dec 2025 \u2013 Nov 2026')
+  })
+
+  it('names a short first year from its first month, abbreviated as the columns are', () => {
+    expect(formatTrendsWindow(['2026-09', '2026-10', '2026-11'])).toBe('Sept 2026 \u2013 Nov 2026')
+  })
+
+  it('names a lone month once', () => {
+    expect(formatTrendsWindow(['2026-11'])).toBe('Nov 2026')
   })
 })
 
