@@ -15,6 +15,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as SignedInIndexRouteImport } from './routes/_signed-in/index'
+import { Route as SignedInPrototypeTrendsRouteImport } from './routes/_signed-in/prototype-trends'
 import { Route as SignedInRecurringRouteImport } from './routes/_signed-in/recurring'
 import { Route as SignedInSettingsRouteImport } from './routes/_signed-in/settings'
 import { Route as SignedInTransactionsRouteImport } from './routes/_signed-in/transactions'
@@ -48,6 +49,11 @@ const SignedInIndexRoute = SignedInIndexRouteImport.update({
   path: '/',
   getParentRoute: () => SignedInRoute,
 } as any)
+const SignedInPrototypeTrendsRoute = SignedInPrototypeTrendsRouteImport.update({
+  id: '/prototype-trends',
+  path: '/prototype-trends',
+  getParentRoute: () => SignedInRoute,
+} as any)
 const SignedInRecurringRoute = SignedInRecurringRouteImport.update({
   id: '/recurring',
   path: '/recurring',
@@ -70,6 +76,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/prototype-trends': typeof SignedInPrototypeTrendsRoute
   '/recurring': typeof SignedInRecurringRoute
   '/settings': typeof SignedInSettingsRoute
   '/transactions': typeof SignedInTransactionsRoute
@@ -79,6 +86,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/prototype-trends': typeof SignedInPrototypeTrendsRoute
   '/recurring': typeof SignedInRecurringRoute
   '/settings': typeof SignedInSettingsRoute
   '/transactions': typeof SignedInTransactionsRoute
@@ -91,6 +99,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/_signed-in/prototype-trends': typeof SignedInPrototypeTrendsRoute
   '/_signed-in/recurring': typeof SignedInRecurringRoute
   '/_signed-in/settings': typeof SignedInSettingsRoute
   '/_signed-in/transactions': typeof SignedInTransactionsRoute
@@ -104,6 +113,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sign-in'
     | '/sign-up'
+    | '/prototype-trends'
     | '/recurring'
     | '/settings'
     | '/transactions'
@@ -113,6 +123,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sign-in'
     | '/sign-up'
+    | '/prototype-trends'
     | '/recurring'
     | '/settings'
     | '/transactions'
@@ -124,6 +135,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sign-in'
     | '/sign-up'
+    | '/_signed-in/prototype-trends'
     | '/_signed-in/recurring'
     | '/_signed-in/settings'
     | '/_signed-in/transactions'
@@ -182,6 +194,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignedInIndexRouteImport
       parentRoute: typeof SignedInRoute
     }
+    '/_signed-in/prototype-trends': {
+      id: '/_signed-in/prototype-trends'
+      path: '/prototype-trends'
+      fullPath: '/prototype-trends'
+      preLoaderRoute: typeof SignedInPrototypeTrendsRouteImport
+      parentRoute: typeof SignedInRoute
+    }
     '/_signed-in/recurring': {
       id: '/_signed-in/recurring'
       path: '/recurring'
@@ -207,6 +226,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface SignedInRouteChildren {
+  SignedInPrototypeTrendsRoute: typeof SignedInPrototypeTrendsRoute
   SignedInRecurringRoute: typeof SignedInRecurringRoute
   SignedInSettingsRoute: typeof SignedInSettingsRoute
   SignedInTransactionsRoute: typeof SignedInTransactionsRoute
@@ -214,6 +234,7 @@ interface SignedInRouteChildren {
 }
 
 const SignedInRouteChildren: SignedInRouteChildren = {
+  SignedInPrototypeTrendsRoute: SignedInPrototypeTrendsRoute,
   SignedInRecurringRoute: SignedInRecurringRoute,
   SignedInSettingsRoute: SignedInSettingsRoute,
   SignedInTransactionsRoute: SignedInTransactionsRoute,
