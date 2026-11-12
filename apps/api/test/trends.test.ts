@@ -2,11 +2,13 @@ import { addMonths, monthOf, periodRange, todayIn } from '@for-wealth/shared'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { pool } from '../src/db/client.js'
 import {
+  archiveCategory,
   getCategories,
   getTrends,
   NEW_USER,
   OTHER_USER,
   postTransaction,
+  putBudgets,
   signInNewUser,
   startFresh,
 } from './helpers.js'
@@ -195,5 +197,141 @@ describe('GET /api/trends: whose data', () => {
     const res = await getTrends(undefined, { to: MONTH })
 
     expect(res.status).toBe(401)
+  })
+})
+
+async function setLimit(cookie: string, categoryId: string, month: string, limit: number | null) {
+  const res = await putBudgets(cookie, { month }, { limits: [{ categoryId, limit }] })
+  if (res.status !== 204) throw new Error(`Saving a Budget failed: ${res.status}`)
+}
+
+type CategoryTrends = {
+  to: string
+  first: string | null
+  category: { id: string; name: string; kind: 'income' | 'expense'; archived: boolean }
+  months: { month: string; total: number; budget: number | null }[]
+}
+
+async function categoryTrendsFor(cookie: string, category: string, to = MONTH) {
+  const res = await getTrends(cookie, { to, category })
+  if (res.status !== 200) throw new Error(`Loading Trends failed: ${res.status}`)
+  return (await res.json()) as CategoryTrends
+}
+
+describe('GET /api/trends: one Category', () => {
+  it('totals that Category each month, over the window every Transaction sets', async () => {
+    const cookie = await signInNewUser()
+    const expense = await categoryIds(cookie, 'expense')
+    const income = await categoryIds(cookie, 'income')
+    // The first Transaction isn't Food's, but it still starts the window.
+    await add(cookie, income.Salary, 500_000, firstOf(3))
+    await add(cookie, expense.Food, 1_250, firstOf(2))
+    await add(cookie, expense.Food, 750, firstOf(2))
+    await add(cookie, expense.Transport, 4_000, firstOf(2))
+    await add(cookie, expense.Food, 80_750, FIRST)
+
+    const res = await getTrends(cookie, { to: MONTH, category: expense.Food! })
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({
+      to: MONTH,
+      first: monthsAgo(3),
+      category: { id: expense.Food, name: 'Food', kind: 'expense', archived: false },
+      months: [
+        { month: monthsAgo(3), total: 0, budget: null },
+        { month: monthsAgo(2), total: 2_000, budget: null },
+        { month: monthsAgo(1), total: 0, budget: null },
+        { month: MONTH, total: 80_750, budget: null },
+      ],
+    })
+  })
+
+  it('gives each month the Budget limit carried forward to it, and none once it is removed', async () => {
+    const cookie = await signInNewUser()
+    const expense = await categoryIds(cookie, 'expense')
+    await add(cookie, expense.Food, 55_000, firstOf(3))
+    await setLimit(cookie, expense.Food!, monthsAgo(5), 50_000)
+    await setLimit(cookie, expense.Food!, monthsAgo(2), 60_000)
+    await setLimit(cookie, expense.Food!, MONTH, null)
+
+    const body = await categoryTrendsFor(cookie, expense.Food!)
+
+    expect(body.months).toEqual([
+      { month: monthsAgo(3), total: 55_000, budget: 50_000 },
+      { month: monthsAgo(2), total: 0, budget: 60_000 },
+      { month: monthsAgo(1), total: 0, budget: 60_000 },
+      { month: MONTH, total: 0, budget: null },
+    ])
+  })
+
+  it('has no Budget for an Income Category', async () => {
+    const cookie = await signInNewUser()
+    const income = await categoryIds(cookie, 'income')
+    await add(cookie, income.Salary, 500_000, firstOf(1))
+
+    const body = await categoryTrendsFor(cookie, income.Salary!)
+
+    expect(body.category).toMatchObject({ name: 'Salary', kind: 'income' })
+    expect(body.months).toEqual([
+      { month: monthsAgo(1), total: 500_000, budget: null },
+      { month: MONTH, total: 0, budget: null },
+    ])
+  })
+
+  it('works for an archived Category, which keeps the limits it had before it was archived', async () => {
+    const cookie = await signInNewUser()
+    const expense = await categoryIds(cookie, 'expense')
+    await add(cookie, expense.Food, 1_250, firstOf(2))
+    await setLimit(cookie, expense.Food!, monthsAgo(2), 40_000)
+    // Archiving ends the Budget from this month.
+    expect((await archiveCategory(cookie, expense.Food!)).status).toBe(204)
+
+    const body = await categoryTrendsFor(cookie, expense.Food!)
+
+    expect(body.category).toEqual({ id: expense.Food, name: 'Food', kind: 'expense', archived: true })
+    expect(body.months).toEqual([
+      { month: monthsAgo(2), total: 1_250, budget: 40_000 },
+      { month: monthsAgo(1), total: 0, budget: 40_000 },
+      { month: MONTH, total: 0, budget: null },
+    ])
+  })
+
+  it('has no months with no Transactions, but still names the Category', async () => {
+    const cookie = await signInNewUser()
+    const expense = await categoryIds(cookie, 'expense')
+
+    const body = await categoryTrendsFor(cookie, expense.Food!)
+
+    expect(body).toEqual({
+      to: MONTH,
+      first: null,
+      category: { id: expense.Food, name: 'Food', kind: 'expense', archived: false },
+      months: [],
+    })
+  })
+
+  it('gives 400 for a `category` that isn’t an ID', async () => {
+    const cookie = await signInNewUser()
+
+    const res = await getTrends(cookie, { to: MONTH, category: 'food' })
+
+    expect(res.status).toBe(400)
+    expect(Object.keys(((await res.json()) as { fields: object }).fields)).toEqual(['category'])
+  })
+
+  it.each([
+    ['an unknown Category', async () => crypto.randomUUID()],
+    [
+      'another user’s Category',
+      async () => (await categoryIds(await signInNewUser(OTHER_USER), 'expense')).Food!,
+    ],
+  ])('gives 404 for %s', async (_, idFor) => {
+    const cookie = await signInNewUser()
+    const category = await idFor()
+
+    const res = await getTrends(cookie, { to: MONTH, category })
+
+    expect(res.status).toBe(404)
+    expect(await res.json()).toMatchObject({ code: 'CATEGORY_NOT_FOUND' })
   })
 })

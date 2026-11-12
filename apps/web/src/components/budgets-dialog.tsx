@@ -27,6 +27,7 @@ import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
 import { type Budget, BUDGETS_KEY, budgetsQuery } from '@/lib/budgets'
 import { DASHBOARD_KEY } from '@/lib/dashboard'
+import { TRENDS_KEY } from '@/lib/trends'
 import { isTooManyWrites, TOO_MANY_WRITES } from '@/lib/write-limit'
 
 // One typed field per Category; blank means no limit.
@@ -159,6 +160,7 @@ function BudgetsForm({
     if (res.ok) {
       void queryClient.invalidateQueries({ queryKey: BUDGETS_KEY })
       void queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY })
+      void queryClient.invalidateQueries({ queryKey: TRENDS_KEY })
       return onDone()
     }
     if (res.status === 404) {

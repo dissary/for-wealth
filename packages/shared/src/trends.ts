@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { budgetProgress } from './budgets.js'
 import type { CurrencyCode } from './currency.js'
 import { addMonths, type CalendarMonth, firstDayOf, isCalendarMonth, monthOf, todayIn, utcMidnight } from './dates.js'
 import { decimalPlacesOf, formatAmount } from './money.js'
@@ -105,5 +106,31 @@ export function trendsScale(max: number, currency: CurrencyCode) {
       value: value * unit,
       label: axisLabel.format(value).toLowerCase(),
     })),
+  }
+}
+
+// One month of one Category on Trends: its total and the Budget limit carried
+// forward to it, both in minor units, or null with no limit.
+export interface CategoryTrendsMonth {
+  month: CalendarMonth
+  total: number
+  budget: number | null
+}
+
+// The figures over one Category's chart, for the months shown, which aren't
+// empty: their total, the average a month, rounded to a whole minor unit, and
+// how many of the months with a Budget were Overspent. This month is left out
+// of that count, as it's still filling (v1-spec "Trends").
+export function categoryTrendsFigures(months: readonly CategoryTrendsMonth[], thisMonth: CalendarMonth) {
+  const total = months.reduce((sum, month) => sum + month.total, 0)
+  const budgeted = months.filter((month) => month.budget !== null && month.month !== thisMonth)
+  return {
+    total,
+    average: Math.round(total / months.length),
+    // Counted as the Dashboard's Budgets are (v1-spec "Budgets").
+    overspent: {
+      months: budgeted.filter(({ total, budget }) => budgetProgress(total, budget!).overspent).length,
+      of: budgeted.length,
+    },
   }
 }
