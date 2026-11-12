@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { CurrencyCode } from './currency.js'
-import { addMonths, type CalendarMonth, firstDayOf, isCalendarMonth, monthOf, todayIn } from './dates.js'
+import { addMonths, type CalendarMonth, firstDayOf, isCalendarMonth, monthOf, todayIn, utcMidnight } from './dates.js'
 import { decimalPlacesOf, formatAmount } from './money.js'
 import { formatPeriodLabel } from './periods.js'
 import { EARLIEST_DATE } from './transactions.js'
@@ -23,6 +23,41 @@ export function trendsMonths(to: CalendarMonth, first: CalendarMonth | null): Ca
   const months: CalendarMonth[] = []
   for (let month = start; month <= to; month = stepMonths(month, 1)) months.push(month)
   return months
+}
+
+// The last month of the window Trends shows after ‹ (-1) or › (1): a whole
+// year earlier or later, except that › never goes past this month, so from a
+// window ending within the last year it lands on this month (v1-spec
+// "Trends"). Null when that way is off: › once the window ends this month,
+// and ‹ once it starts at `first`, the month of the user's earliest
+// Transaction, as nothing comes before it, or with no Transactions (`first`
+// null).
+export function stepTrendsWindow(
+  to: CalendarMonth,
+  direction: -1 | 1,
+  { first, thisMonth }: { first: CalendarMonth | null; thisMonth: CalendarMonth },
+): CalendarMonth | null {
+  if (direction === 1) {
+    if (to >= thisMonth) return null
+    const next = stepMonths(to, TRENDS_WINDOW)
+    return next < thisMonth ? next : thisMonth
+  }
+  if (first === null || first >= stepMonths(to, 1 - TRENDS_WINDOW)) return null
+  return stepMonths(to, -TRENDS_WINDOW)
+}
+
+// Read and formatted in UTC, like the other month labels, so the device's
+// zone can't move a month.
+const shortMonthLabel = new Intl.DateTimeFormat('en-MY', { month: 'short', year: 'numeric', timeZone: 'UTC' })
+
+// The months a Trends window shows, as named beside ‹ ›: "Dec 2025 – Nov
+// 2026", or "Nov 2026" for a lone month. `months` is oldest first and not
+// empty, as trendsMonths gives them.
+export function formatTrendsWindow(months: readonly CalendarMonth[]): string {
+  const label = (month: CalendarMonth) => shortMonthLabel.format(utcMidnight(firstDayOf(month)))
+  const first = label(months[0]!)
+  const last = label(months.at(-1)!)
+  return first === last ? first : `${first} \u2013 ${last}`
 }
 
 // The last month of a Trends window, for a user in `timeZone`: from the month
