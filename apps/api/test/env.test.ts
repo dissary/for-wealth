@@ -8,8 +8,19 @@ const valid = {
 }
 
 describe('parseEnv', () => {
-  it('accepts a valid environment, with the port defaulting to 3000', () => {
-    expect(parseEnv(valid)).toEqual({ ...valid, PORT: 3000 })
+  it('accepts a valid environment, with the port defaulting to 3000 and sign-up open', () => {
+    expect(parseEnv(valid)).toEqual({ ...valid, PORT: 3000, ALLOW_SIGN_UP: true })
+  })
+
+  it.each([
+    ['false', false],
+    ['true', true],
+  ])('reads ALLOW_SIGN_UP=%s as %s', (value, expected) => {
+    expect(parseEnv({ ...valid, ALLOW_SIGN_UP: value }).ALLOW_SIGN_UP).toBe(expected)
+  })
+
+  it('refuses an ALLOW_SIGN_UP that is not a yes or no', () => {
+    expect(() => parseEnv({ ...valid, ALLOW_SIGN_UP: 'maybe' })).toThrow(/ALLOW_SIGN_UP/)
   })
 
   it('reads the port as a number', () => {
