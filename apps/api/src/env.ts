@@ -8,6 +8,12 @@ const envSchema = z.object({
   // public URL in production. Email links and cookies are built from it.
   BETTER_AUTH_URL: z.url({ protocol: /^https?$/ }),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+  // "false" refuses every sign-up. Production sets it once its accounts
+  // exist, so a stranger who finds the address can't make one.
+  ALLOW_SIGN_UP: z.stringbool().default(true),
+  // The built web app (apps/web/dist). Set in production, where the API
+  // serves it on the same address; unset in development, where Vite does.
+  WEB_DIST_DIR: z.string().min(1).optional(),
 })
 
 export type Env = z.infer<typeof envSchema>

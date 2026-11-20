@@ -45,6 +45,8 @@ export const auth = betterAuth({
 
   emailAndPassword: {
     enabled: true,
+    // Signing in, and resetting a password, still work for existing accounts.
+    disableSignUp: !env.ALLOW_SIGN_UP,
     minPasswordLength: PASSWORD_MIN_LENGTH,
     maxPasswordLength: PASSWORD_MAX_LENGTH,
     // Looked up on each call, so tests can swap the hash.
